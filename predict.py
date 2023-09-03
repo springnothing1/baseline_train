@@ -138,11 +138,11 @@ def load_net(path=None, new=False):
 
     return net
 
-def create_dataset_loader(root_dir, cities, task, seq_length, batch_size):
+def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim):
 
     # get transform
     meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
-    transform = configure_transform(image_dim = (480, 640), meta = meta)
+    transform = configure_transform(image_dim = image_dim, meta = meta)
 
     # positive are defined within a radius of 25 m 阳性定义在25米的半径范围内
     posDistThr = 25
@@ -165,15 +165,16 @@ def create_dataset_loader(root_dir, cities, task, seq_length, batch_size):
     return val_dataset, qLoader, dbLoader
     
 
-def main(net, device, task, seq_length, out_path, cities, batch_size):
+def main(net, task, image_dim, seq_length, out_path, cities, batch_size):
     # the location of msls_dataset in computer
     root_dir = '/datasets/msls'
+    device = list(net.parameters())[0].device
 
     # set the size of batch
     # batch_size = batch_size
 
     # create the datasets and dataloaders   (root_dir, cities, task, seq_length, batch_size)
-    val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size)
+    val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim)
 
     print("***load the net successfully")
     # compute the feature of query and database 
