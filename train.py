@@ -39,7 +39,7 @@ def get_net(net_name = "resnet50+gem"):
         # use an adaptiveavg-pooling in the GeMpooling,kernel_size=(1, 1)
         gem = GeMPooling(net_list[-1].in_features, output_size=(1, 1))
         net.back = nn.Sequential(gem, pretrained_net.fc)
-    elif net_name == "vit_base_16":
+    elif net_name == "vit":
         net = torchvision.models.vit_b_16(weights='IMAGENET1K_V1')
     return net
 
@@ -219,7 +219,7 @@ def main():
     parser.add_argument('--net-name',
                         type=str,
                         default="resnet50+gem",
-                        help='choose net: resnet50+gem or vit_base_16')
+                        help='choose net: resnet50+gem or vit')
     parser.add_argument('--predict-batch-size',
                         type=int,
                         default=190,
@@ -230,17 +230,15 @@ def main():
                         help='Path to the dataset')
     parser.add_argument('--cities',
                         type=str,
-                        default="trondheim,london,boston,melbourne,amsterdam,helsinki, \
-                            tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,\
-                            berlin,ottawa,phoenix,goa,amman,nairobi,manila",
+                        default="trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,berlin,ottawa,phoenix,goa,amman,nairobi,manila",
                         help='The cities to train on')
     parser.add_argument('--cached-queries',
                         type=int,
-                        default=60000,
+                        default=200000,
                         help='The length of cached queries')
     parser.add_argument('--cached-negatives',
                         type=int,
-                        default=80000,
+                        default=400000,
                         help='The length of cached queries')
     parser.add_argument('--val-cities',
                         type=str,
@@ -257,7 +255,7 @@ def main():
                                     {"params":net.base.parameters()}], 
                                     lr=args.lr)
         image_dim = (480, 640)
-    elif net_name == "vit_base_16":
+    elif net_name == "vit":
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
         optimizer = torch.optim.Adam([{"params":net.conv_proj.parameters()}, 
                                       {"params":net.encoder.parameters()},
