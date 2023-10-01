@@ -259,7 +259,7 @@ def main():
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
         optimizer = torch.optim.Adam([{"params":net.conv_proj.parameters()}, 
                                       {"params":net.encoder.parameters()},
-                                      {"params":net.heads.parameters(), "lr":args.lr * 100}], 
+                                      {"params":net.heads.parameters(), "lr":args.lr * 10}], 
                                     lr=args.lr)
         image_dim = (224, 224)
     
