@@ -15,8 +15,9 @@ import argparse
 import torchvision
 from torch import nn
 from pathlib import Path
-from GeMPooling import GeMPooling 
 from d2l import torch as d2l
+from GeMPooling import GeMPooling 
+from infonce_loss import InfoNCELoss
 from triplet_loss_cos import TripletLoss
 from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.utils.utils import configure_transform
@@ -94,7 +95,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
             
             optimizer.zero_grad()
             
-            l = loss(y_hat, q_seq_length, db_seq_length, N)
+            l = loss(y_hat, q_seq_length, db_seq_length, N, device)
             
             l.backward()
             optimizer.step()
@@ -220,6 +221,10 @@ def main():
                         type=str,
                         default="resnet50+gem",
                         help='choose net: resnet50+gem or vit')
+    parser.add_argument('--loss',
+                        type=str,
+                        default="triplet",
+                        help='choose loss function: triplet or infonce')
     parser.add_argument('--predict-batch-size',
                         type=int,
                         default=190,
@@ -272,7 +277,12 @@ def main():
 
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
     # loss = nn.TripletMarginLoss(margin=0.1, p=2)
-    loss = TripletLoss(margin=0.1)
+
+    if args.loss == "triplet":
+        loss = TripletLoss(margin=0.1)
+    elif args.loss == "infonce":
+        loss = InfoNCELoss(t=0.1)
+    
     print("*************we will start training***************************")
 
     train(args, net, trainDataloader, loss, optimizer, device, image_dim)

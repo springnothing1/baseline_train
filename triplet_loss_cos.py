@@ -13,7 +13,7 @@ class TripletLoss(nn.Module):
         
         self.loss = nn.MarginRankingLoss(margin=margin, reduction='mean')
 
-    def forward(self, input, q_length, db_length, N):
+    def forward(self, input, q_length, db_length, N, *args):
         # input1 is the anchor, input2 contains pos and neg
         input1 = input[:, :q_length, :]
         input2 = input[:, q_length:, :]
