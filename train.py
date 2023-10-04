@@ -268,23 +268,30 @@ def main():
                                     lr=args.lr)
         image_dim = (224, 224)
     
-    print(f"***************Load the {net_name} net sucessfully*********************")
+    print(f"***************Load the {net_name} net sucessfully*********************\n")
 
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
     trainDataloader = create_dataloader(args, image_dim)
 
-    print("\n***************Load the trainDataset sucessfully**************")
+    print("\n***************Load the trainDataset sucessfully****************")
 
+    # choose the device to train the net
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
-    # loss = nn.TripletMarginLoss(margin=0.1, p=2)
 
+    print(f"\n***************Trained on the {device}***************************")
+
+    # choose the loss function used to train the net
     if args.loss == "triplet":
         loss = TripletLoss(margin=0.1)
-    elif args.loss == "infonce":
-        loss = InfoNCELoss(t=0.1)
-    
-    print("*************we will start training***************************")
+        print(f"\n***************The loss is : Triplet Loss***********************")
 
+    elif args.loss == "infonce":
+        loss = InfoNCELoss(t=0.01)
+        print(f"\n***************The loss is : InfoNCE Loss***********************")
+    
+    print("\n******************we will start training************************")
+
+    # start training
     train(args, net, trainDataloader, loss, optimizer, device, image_dim)
 
 
