@@ -161,7 +161,7 @@ def create_dataloader(args, image_dim):
     # return the train dataset
     train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
-                        posDistThr = 5, nNeg = 5, cached_queries = args.cached_queries, 
+                        posDistThr = 5, nNeg = 10, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
                     
     
@@ -286,7 +286,7 @@ def main():
         print(f"\n***************The loss is : Triplet Loss***********************")
 
     elif args.loss == "infonce":
-        loss = InfoNCELoss(t=0.01)
+        loss = InfoNCELoss(t=0.1)
         print(f"\n***************The loss is : InfoNCE Loss***********************")
     
     print("\n******************we will start training************************")

@@ -7,6 +7,6 @@ models/
 results/
 train_im2im_loss_log/
 *log/
-*.log
+*log*
 *.params
 *.csv

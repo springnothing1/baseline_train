@@ -16,7 +16,7 @@ class InfoNCELoss(nn.Module):
         input2_normlized = input2 / torch.norm(input2, dim=2, keepdim=True)
 
         # compute thr cos similarity between anchor and pos/neg
-        logits = torch.matmul(input1_normlized, input2_normlized.transpose(1, 2)).squeeze(1)
+        logits = 1 - torch.matmul(input1_normlized, input2_normlized.transpose(1, 2)).squeeze(1)
         
         labels = torch.zeros(logits.shape[0], dtype=torch.long).to(args[-1])
         loss = self.loss(logits / self.t, labels)
