@@ -81,7 +81,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
         net.train()
         metric = d2l.Accumulator(2)
         epoch_start = time.time()
-        print(f'\n\nepoch{epoch + 1} is start:')
+        print(f'\n\nepoch{epoch} is start:')
         for i, (sequences, labels) in enumerate(train_iter):
             if epoch == 0:
                 N = labels.shape[1]
@@ -104,17 +104,17 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
             train_loss = metric[0] / metric[1]
             
             if i % 1000 == 0:
-                print(f'epoch:{epoch + 1}, batch:{i + 1}, loss:{train_loss:f}')
+                print(f'epoch:{epoch + 1}/{args.num_epochs},\tbatch:{i}/{len(train_iter)},\tloss:{train_loss:f}')
                 niter = epoch * len(train_iter) + i
                 writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
-        print(f'epoch{epoch + 1} is end')
+        print(f'epoch{epoch} is end')
     
         # save the models and evaluate the predictions from the net now
         save_evaluate(args, net, epoch, image_dim)
 
         # record the time
         epoch_end = time.time()
-        print(f'\nnow loss:{train_loss:f}, time:{epoch_end - epoch_start}s({((epoch_end - epoch_start) / 60):.2} min)\n')
+        print(f'\nnow loss:{train_loss:f}, time:{epoch_end - epoch_start}s({((epoch_end - epoch_start) / 3600):.2} hours)\n')
         print("****************************************************************")
     
     end_time = time.time()
@@ -123,7 +123,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
     writer.close()
 
     print(f'\n******the train is end *****************************************')
-    print(f'in the end, cost time:{all_time // 60}min, loss:{train_loss:f}')
+    print(f'in the end, cost time:{all_time // 3600}hours, loss:{train_loss:f}')
                        
             
 def split_seq(sequences, N, task):
@@ -161,7 +161,7 @@ def create_dataloader(args, image_dim):
     # return the train dataset
     train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
-                        posDistThr = 5, nNeg = 30, cached_queries = args.cached_queries, 
+                        posDistThr = 5, nNeg = args.num_negatives, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
                     
     
@@ -221,13 +221,17 @@ def main():
                         type=str,
                         default="resnet50+gem",
                         help='choose net: resnet50+gem or vit')
+    parser.add_argument('--num-negatives',
+                        type=int,
+                        default=5,
+                        help='choose the number of negatives in one triplet')
     parser.add_argument('--loss',
                         type=str,
                         default="triplet",
                         help='choose loss function: triplet or infonce')
     parser.add_argument('--predict-batch-size',
                         type=int,
-                        default=190,
+                        default=512,
                         help='The size of predict batch,190 for resnet50,')
     parser.add_argument('--msls-root',
                         type=Path,
@@ -251,6 +255,11 @@ def main():
                         help='Choose the cities to be predicted and evaluated')
     args = parser.parse_args()
     
+    # print the configure of training
+    print("the configure of training :")
+    for k, v in args.__dict__.items():
+        print(f"{k}: {v}")
+
     # get the net(new=True)you can choose to change something in the end
     net_name = args.net_name
     net = get_net(net_name)

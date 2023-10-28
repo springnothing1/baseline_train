@@ -10,3 +10,4 @@ train_im2im_loss_log/
 *log*
 *.params
 *.csv
+*.sh
