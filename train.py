@@ -161,7 +161,7 @@ def create_dataloader(args, image_dim):
     # return the train dataset
     train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
-                        posDistThr = 5, nNeg = 10, cached_queries = args.cached_queries, 
+                        posDistThr = 5, nNeg = 30, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
                     
     
@@ -262,10 +262,7 @@ def main():
         image_dim = (480, 640)
     elif net_name == "vit":
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-        optimizer = torch.optim.Adam([{"params":net.conv_proj.parameters()}, 
-                                      {"params":net.encoder.parameters()},
-                                      {"params":net.heads.parameters(), "lr":args.lr * 10}], 
-                                    lr=args.lr)
+        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
         image_dim = (224, 224)
     
     print(f"***************Load the {net_name} net sucessfully*********************\n")
@@ -286,7 +283,7 @@ def main():
         print(f"\n***************The loss is : Triplet Loss***********************")
 
     elif args.loss == "infonce":
-        loss = InfoNCELoss(t=0.1)
+        loss = InfoNCELoss(t=0.02)
         print(f"\n***************The loss is : InfoNCE Loss***********************")
     
     print("\n******************we will start training************************")
