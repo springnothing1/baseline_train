@@ -45,18 +45,43 @@ def get_net(net_name = "resnet50+gem"):
     return net
 
 
-def save_evaluate(args, net, epoch, image_dim):
+def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer):
+    net.train()
+    metric = d2l.Accumulator(2)
+    for i, (sequences, labels) in enumerate(train_iter):
+        N = labels.shape[1]
+        q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
+        # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
+        s_shape = sequences.shape
+        X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(device)
+
+        y_hat = net(X)
+        y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
+        
+        optimizer.zero_grad()
+        
+        l = loss(y_hat, q_seq_length, db_seq_length, N, device)
+        
+        l.backward()
+        optimizer.step()
+        metric.add(l * sequences.shape[0], labels.numel())
+        
+        train_loss = metric[0] / metric[1]
+        
+        if i % 1000 == 0:
+            print(f'epoch:{epoch + 1}/{args.num_epochs},\tbatch:{i}/{len(train_iter)},\tloss:{train_loss:f}')
+            niter = epoch * len(train_iter) + i
+            writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
+        
+        return train_loss
+
+
+def save_evaluate(args, net, epoch, image_dim, optimizer):
     task = args.task
     outpath = args.out_path
 
-    # create the path to save the models and evaluate results
-    if not os.path.exists(outpath):
-        os.makedirs(outpath)
-
-    # save the model trained
-    model_path = Path(os.path.join(outpath, Path(f"task{task}_epoch{epoch + 1}_lr{args.lr}.params")))
-    torch.save(net.state_dict(), model_path)
-    print(f'save the net successfully!!')
+    """torch.save(net.state_dict(), model_path)
+    print(f'save the net successfully!!')"""
 
     # predict and save the keys
     print(f'\nStart to predict the keys of val cities: {args.val_cities}')
@@ -70,51 +95,64 @@ def save_evaluate(args, net, epoch, image_dim):
     evaluate.main(predict_path, evaluate_path, args.val_cities, task, args.seq_length)
     print(f'evaluate the model sucessfully! you can see the result in {outpath}')
 
+
+
+def reload_checkpoint(args, net, optimizer, path_checkpoint):
+    # load the checkpoint
+    checkpoint = torch.load(path_checkpoint)
+
+    start_epoch = checkpoint['epoch']
+    net.load_state_dict(checkpoint['net'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    loss = checkpoint['loss']
+
+    return net, optimizer, start_epoch, loss
+
+
+def save_checkpoint(net, optimizer, epoch, loss, model_path):
+    checkpoint = {
+        'epoch':epoch,
+        'net':net.state_dict(),
+        'optimizer':optimizer.state_dict(),
+        'loss':loss}
+    torch.save(checkpoint, model_path)
+
+
 def train(args, net, train_iter, loss, optimizer, device, image_dim):
     """train funtion"""
-    
     net.to(device)
     start_time = time.time()
     writer = SummaryWriter(args.loss_path)
+    start_epoch = -1
 
-    for epoch in range(args.num_epochs):
-        net.train()
-        metric = d2l.Accumulator(2)
+    # create the path to save the models and evaluate results
+    if not os.path.exists(args.out_path):
+        os.makedirs(args.out_path)
+    model_path = Path(os.path.join(args.out_path, Path("model.pt")))
+
+    # reload the checkpoint if resume==True
+    if args.resume:
+        net, optimizer, start_epoch, loss = reload_checkpoint(args, net, optimizer, model_path)
+
+    for epoch in range(start_epoch + 1, args.num_epochs):
+        
         epoch_start = time.time()
-        print(f'\n\nepoch{epoch} is start:')
-        for i, (sequences, labels) in enumerate(train_iter):
-            if epoch == 0:
-                N = labels.shape[1]
-                q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
-            # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
-            s_shape = sequences.shape
-            X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(device)
+        print(f'\n\nepoch {epoch + 1}/{args.num_epochs} is start:')
+        
+        # train for every epoch
+        train_loss = train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer)
 
-            y_hat = net(X)
-            y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
-            
-            optimizer.zero_grad()
-            
-            l = loss(y_hat, q_seq_length, db_seq_length, N, device)
-            
-            l.backward()
-            optimizer.step()
-            metric.add(l * sequences.shape[0], labels.numel())
-            
-            train_loss = metric[0] / metric[1]
-            
-            if i % 1000 == 0:
-                print(f'epoch:{epoch + 1}/{args.num_epochs},\tbatch:{i}/{len(train_iter)},\tloss:{train_loss:f}')
-                niter = epoch * len(train_iter) + i
-                writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
-        print(f'epoch{epoch} is end')
+        #set checkpoint
+        save_checkpoint(net, optimizer, epoch, loss, model_path)
+        print(f'save the net successfully!!')
     
         # save the models and evaluate the predictions from the net now
-        save_evaluate(args, net, epoch, image_dim)
+        save_evaluate(args, net, epoch, image_dim, optimizer)
 
         # record the time
         epoch_end = time.time()
-        print(f'\nnow loss:{train_loss:f}, time:{epoch_end - epoch_start}s({((epoch_end - epoch_start) / 3600):.2} hours)\n')
+        print(f'epoch{epoch} is end')
+        print(f'\nnow loss:{train_loss:f}, time:{((epoch_end - epoch_start) / 60):.3}s ({((epoch_end - epoch_start) / 3600):.3} hours)\n')
         print("****************************************************************")
     
     end_time = time.time()
@@ -229,6 +267,10 @@ def main():
                         type=str,
                         default="triplet",
                         help='choose loss function: triplet or infonce')
+    parser.add_argument('--resume',
+                        type=bool,
+                        default=False,
+                        help='if you want to train from the checkpoint')
     parser.add_argument('--predict-batch-size',
                         type=int,
                         default=512,
@@ -297,7 +339,6 @@ def main():
     
     print("\n******************we will start training************************")
 
-    # start training
     train(args, net, trainDataloader, loss, optimizer, device, image_dim)
 
 
