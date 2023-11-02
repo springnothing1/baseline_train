@@ -69,11 +69,11 @@ def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer):
         train_loss = metric[0] / metric[1]
         
         if i % 1000 == 0:
-            print(f'epoch:{epoch + 1}/{args.num_epochs},\tbatch:{i}/{len(train_iter)},\tloss:{train_loss:f}')
+            print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
         
-        return train_loss
+    return train_loss
 
 
 def save_evaluate(args, net, epoch, image_dim, optimizer):
@@ -137,7 +137,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
     for epoch in range(start_epoch + 1, args.num_epochs):
         
         epoch_start = time.time()
-        print(f'\n\nepoch {epoch + 1}/{args.num_epochs} is start:')
+        print(f'\n\nepoch [{epoch + 1}/{args.num_epochs}] is start:')
         
         # train for every epoch
         train_loss = train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer)
@@ -152,7 +152,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
         # record the time
         epoch_end = time.time()
         print(f'epoch{epoch} is end')
-        print(f'\nnow loss:{train_loss:f}, time:{((epoch_end - epoch_start) / 60):.3}s ({((epoch_end - epoch_start) / 3600):.3} hours)\n')
+        print(f'\nnow loss:{train_loss:f}, time:{((epoch_end - epoch_start) / 60):.3}min ({((epoch_end - epoch_start) / 3600):.3} hours)\n')
         print("****************************************************************")
     
     end_time = time.time()
