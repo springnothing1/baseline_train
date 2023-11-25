@@ -1,7 +1,9 @@
 import os
 import torch
 import argparse
+import evaluate
 import torchvision
+import GeMPooling
 from torch import nn
 from pathlib import Path
 from mapillary_sls.datasets.msls import MSLS
@@ -115,25 +117,35 @@ def save_to_csv(q_keys, db_keys, path):
             f.write("\n")
 
 
-def get_net(new=False):
-    """get the resnet50 and you can change something in it"""
-    pretrained_net = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V1)
+def get_net(net_name = "resnet50+gem"):
+    """get the net of resnet50 with gempooling or ViT_base_16 """
     
-    # if the pretrained_net is not good, use the net
-    if new == False:
-        net = pretrained_net
-    else:
-        net = pretrained_net
-        net.fc = nn.Linear(2048, 256, bias=True)
+    if net_name == "resnet50+gem":
+        pretrained_net = torchvision.models.resnet50()
+        net_list = list(pretrained_net.children())
+
+        # create new net
+        net = nn.Sequential()
+        net.base = nn.Sequential(*net_list[:-2])
+
+        # use an adaptiveavg-pooling in the GeMpooling,kernel_size=(1, 1)
+        gem = GeMPooling(net_list[-1].in_features, output_size=(1, 1))
+        net.back = nn.Sequential()
+        net.back.add_module("gem", gem)
+        net.back.add_module("fc", nn.Linear(in_features=2048, out_features=2048, bias=True))
+        
+        
+    elif net_name == "vit":
+        net = torchvision.models.vit_b_16()
+        # net.heads.head.out_features = 2048
+
     return net
 
 
-def load_net(path=None, new=False):
-    # load the net used for training
-    net = get_net(new)
-    
-    # load the parameters of the trained net
-    net.load_state_dict(torch.load(path))
+def load_net(path=None, net_name=None):
+    net = get_net(net_name)
+    model = torch.load(path)
+    net.load_state_dict(model)
     net.eval()
 
     return net
@@ -225,7 +237,7 @@ if __name__ == "__main__":
                         default="cuda:7",
                         help='Choose the gpu to use (cuda:*)')
     parser.add_argument('--model',
-                        type=Path,
+                        type=str,
                         default=None,
                         help='Import the model trained')
     parser.add_argument('--batch-size',
@@ -236,19 +248,33 @@ if __name__ == "__main__":
                         type=str,
                         default="cph,sf",
                         help='The cities to train on')
-    parser.add_argument('--output',
-                        type=Path,
+    parser.add_argument('--out-path',
+                        type=str,
                         default="./files/my_new_prediction_im2im_val.csv")
-    parser.add_argument('--new-net',
-                        type=bool,
+    parser.add_argument('--net-name',
+                        type=str,
                         default=False,
-                        help='Choose to use the origin resnet50 or not')
+                        help='Choose to use the origin resnet50+gem or vit')
     args = parser.parse_args()
 
     net_path = args.model
-    net = load_net(net_path, new=args.new_net)
+    net = load_net(net_path, net_name=args.net_name)
 
-    device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
+    device = torch.device(args.cuda if torch.cuda.is_available() else "cup")
 
-    main(net, device, args.task, args.seq_length, args.output, args.cities, args.batch_size)
+    net.to(device)
+    # image_dim = (224, 224)
+    if args.net_name == "resnet50+gem":
+        image_dim = (480, 640)
+    elif args.net_name == "vit":
+        image_dim = (224, 224)
+    # main(net, device, args.task, args.seq_length, args.output, args.cities, args.batch_size)
+    main(net, args.task, image_dim, args.seq_length, args.out_path, args.cities, args.batch_size)
+
+    # evaluate the predictions above and save the results
+    # print(f'\nStart to evaluate the prediction of cities: {cities}')
+    out_path = '/'.join(args.out_path.split('/')[:-1])
+    evaluate_path = Path(os.path.join(out_path, Path(f"evaluate_task.csv")))
+    evaluate.main(Path(args.out_path), evaluate_path, args.cities, args.task, args.seq_length)
+    # print(f'evaluate the model sucessfully! you can see the result in {outpath}')
     

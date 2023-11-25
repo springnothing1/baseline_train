@@ -30,18 +30,23 @@ def get_net(net_name = "resnet50+gem"):
     
     if net_name == "resnet50+gem":
         pretrained_net = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V2)
-        """net = nn.Sequential(*list(pretrained_net.children())[:-2])
-        net.add_module("gempooling", GeMPooling(pretrained_net.fc.in_features, output_size=(1, 1)))
-        net.add_module("fc", pretrained_net.fc)"""
         net_list = list(pretrained_net.children())
+
         # create new net
         net = nn.Sequential()
         net.base = nn.Sequential(*net_list[:-2])
+
         # use an adaptiveavg-pooling in the GeMpooling,kernel_size=(1, 1)
         gem = GeMPooling(net_list[-1].in_features, output_size=(1, 1))
-        net.back = nn.Sequential(gem, pretrained_net.fc)
+        net.back = nn.Sequential()
+        net.back.add_module("gem", gem)
+        net.back.add_module("fc", nn.Linear(in_features=2048, out_features=2048, bias=True))
+        
+        
     elif net_name == "vit":
         net = torchvision.models.vit_b_16(weights='IMAGENET1K_V1')
+        # net.heads.head.out_features = 2048
+
     return net
 
 
@@ -76,23 +81,25 @@ def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer):
     return train_loss
 
 
-def save_evaluate(args, net, epoch, image_dim, optimizer):
+def save_evaluate(args, net, epoch, image_dim, cities='cph,sf'):
     task = args.task
     outpath = args.out_path
 
-    """torch.save(net.state_dict(), model_path)
-    print(f'save the net successfully!!')"""
+    # save the model for each epoch
+    model_path = Path(os.path.join(outpath, Path(f"model_{task}_val_epoch{epoch + 1}lr{args.lr}.pt")))
+    torch.save(net.state_dict(), model_path)
+    print(f'save the net successfully!!')
 
     # predict and save the keys
-    print(f'\nStart to predict the keys of val cities: {args.val_cities}')
-    predict_path = Path(os.path.join(outpath, Path(f"prediction_{task}_val_epoch{epoch + 1}lr{args.lr}.csv")))
-    predict.main(net, task, image_dim, args.seq_length, predict_path, args.val_cities, args.predict_batch_size)
+    print(f'\nStart to predict the keys of cities: {cities}')
+    predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}lr{args.lr}.csv")))
+    predict.main(net, task, image_dim, args.seq_length, predict_path, cities, args.predict_batch_size)
     print(f'save the prediction successfully!!')
 
     # evaluate the predictions above and save the results
-    print(f'\nStart to evaluate the prediction of val cities: {args.val_cities}')
-    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{task}_epoch{epoch + 1}lr{args.lr}.csv")))
-    evaluate.main(predict_path, evaluate_path, args.val_cities, task, args.seq_length)
+    print(f'\nStart to evaluate the prediction of cities: {cities}')
+    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}lr{args.lr}.csv")))
+    evaluate.main(predict_path, evaluate_path, cities, task, args.seq_length)
     print(f'evaluate the model sucessfully! you can see the result in {outpath}')
 
 
@@ -102,7 +109,7 @@ def reload_checkpoint(args, net, optimizer, path_checkpoint):
     checkpoint = torch.load(path_checkpoint)
 
     start_epoch = checkpoint['epoch']
-    net.load_state_dict(checkpoint['net'])
+    net.load_state_dict(checkpoint['net'], map_location='cpu')
     optimizer.load_state_dict(checkpoint['optimizer'])
     loss = checkpoint['loss']
 
@@ -146,8 +153,11 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
         save_checkpoint(net, optimizer, epoch, loss, model_path)
         print(f'save the net successfully!!')
     
-        # save the models and evaluate the predictions from the net now
-        save_evaluate(args, net, epoch, image_dim, optimizer)
+        # save the models and evaluate on train_cities
+        save_evaluate(args, net, epoch, image_dim, cities='trondheim,london')#'boston,manila')
+
+        # save the models and evaluate on val_cities
+        save_evaluate(args, net, epoch, image_dim, cities='cph,sf')
 
         # record the time
         epoch_end = time.time()
@@ -307,9 +317,10 @@ def main():
     net = get_net(net_name)
     
     if net_name == "resnet50+gem":
-        optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
-                                    {"params":net.base.parameters()}], 
-                                    lr=args.lr)
+        # optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
+        #                            {"params":net.base.parameters()}], 
+        #                            lr=args.lr)
+        optimizer = torch.optim.Adam(net.parameters(),lr=args.lr)
         image_dim = (480, 640)
     elif net_name == "vit":
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
