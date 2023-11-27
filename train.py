@@ -50,7 +50,7 @@ def get_net(net_name = "resnet50+gem"):
     return net
 
 
-def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer):
+def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, image_dim):
     net.train()
     metric = d2l.Accumulator(2)
     for i, (sequences, labels) in enumerate(train_iter):
@@ -73,34 +73,38 @@ def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer):
         
         train_loss = metric[0] / metric[1]
         
-        if i % 1000 == 0:
+        if i % 10000 == 0:
             print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
+
+            # save the models and evaluate on val_cities
+            save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
         
     return train_loss
 
 
-def save_evaluate(args, net, epoch, image_dim, cities='cph,sf'):
+def save_evaluate(args, net, epoch, image_dim, i=999999, cities='cph,sf'):
     task = args.task
     outpath = args.out_path
 
-    # save the model for each epoch
-    model_path = Path(os.path.join(outpath, Path(f"model_{task}_val_epoch{epoch + 1}lr{args.lr}.pt")))
-    torch.save(net.state_dict(), model_path)
-    print(f'save the net successfully!!')
+    """if i == 999999:
+        # save the model for each epoch
+        model_path = Path(os.path.join(outpath, Path(f"model_{task}_val_epoch{epoch + 1}i{i}.pt")))
+        torch.save(net.state_dict(), model_path)
+        print(f'save the net successfully!!')"""
 
     # predict and save the keys
     print(f'\nStart to predict the keys of cities: {cities}')
-    predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}lr{args.lr}.csv")))
+    predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}i{i}.csv")))
     predict.main(net, task, image_dim, args.seq_length, predict_path, cities, args.predict_batch_size)
     print(f'save the prediction successfully!!')
 
     # evaluate the predictions above and save the results
     print(f'\nStart to evaluate the prediction of cities: {cities}')
-    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}lr{args.lr}.csv")))
+    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}i{i}.csv")))
     evaluate.main(predict_path, evaluate_path, cities, task, args.seq_length)
-    print(f'evaluate the model sucessfully! you can see the result in {outpath}')
+    print(f'evaluate the model sucessfully! you can see the result in {outpath}\n')
 
 
 
@@ -147,7 +151,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
         print(f'\n\nepoch [{epoch + 1}/{args.num_epochs}] is start:')
         
         # train for every epoch
-        train_loss = train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer)
+        train_loss = train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, image_dim)
 
         #set checkpoint
         save_checkpoint(net, optimizer, epoch, loss, model_path)
@@ -295,11 +299,11 @@ def main():
                         help='The cities to train on')
     parser.add_argument('--cached-queries',
                         type=int,
-                        default=200000,
+                        default=300000,
                         help='The length of cached queries')
     parser.add_argument('--cached-negatives',
                         type=int,
-                        default=400000,
+                        default=600000,
                         help='The length of cached queries')
     parser.add_argument('--val-cities',
                         type=str,
@@ -320,7 +324,7 @@ def main():
         # optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
         #                            {"params":net.base.parameters()}], 
         #                            lr=args.lr)
-        optimizer = torch.optim.Adam(net.parameters(),lr=args.lr)
+        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
         image_dim = (480, 640)
     elif net_name == "vit":
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
