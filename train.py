@@ -73,7 +73,7 @@ def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, i
         
         train_loss = metric[0] / metric[1]
         
-        if (i % 100 == 0) and (i != 0):
+        if (i % 1000 == 0) and (i != 0):
             print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
@@ -159,7 +159,7 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
         print(f'save the net successfully!!')
     
         # save the models and evaluate on train_cities
-        save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,tokyo,toronto,saopaulo,moscow,zurich,paris')#'boston,manila')
+        save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,tokyo,toronto')#'boston,manila')
 
         # save the models and evaluate on val_cities
         save_evaluate(args, net, epoch, image_dim, cities='cph,sf')
