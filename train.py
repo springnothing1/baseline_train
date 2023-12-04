@@ -16,9 +16,10 @@ import torchvision
 from torch import nn
 from pathlib import Path
 from d2l import torch as d2l
-from GeMPooling import GeMPooling 
-from infonce_loss import InfoNCELoss
-from triplet_loss_cos import TripletLoss
+from modules.ResViT import ResTransformer
+from modules.GeMPooling import GeMPooling 
+from modules.infonce_loss import InfoNCELoss
+from modules.triplet_loss_cos import TripletLoss
 from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.utils.utils import configure_transform
 from torch.utils.data import DataLoader
@@ -46,6 +47,9 @@ def get_net(net_name = "resnet50+gem"):
     elif net_name == "vit":
         net = torchvision.models.vit_b_16(weights='IMAGENET1K_V1')
         # net.heads.head.out_features = 2048
+
+    elif net_name == "resvit":
+        net = ResTransformer()
 
     return net
 
@@ -321,7 +325,7 @@ def main():
     net_name = args.net_name
     net = get_net(net_name)
     
-    if net_name == "resnet50+gem":
+    if net_name == "resnet50+gem" or "resvit":
         # optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
         #                            {"params":net.base.parameters()}], 
         #                            lr=args.lr)

@@ -3,7 +3,7 @@ import torch
 import argparse
 import evaluate
 import torchvision
-import GeMPooling
+from modules.GeMPooling import GeMPooling
 from torch import nn
 from pathlib import Path
 from mapillary_sls.datasets.msls import MSLS
