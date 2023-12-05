@@ -16,6 +16,7 @@ import torchvision
 from torch import nn
 from pathlib import Path
 from d2l import torch as d2l
+from modules.msloss import MultiSimilarityLoss
 from modules.ResViT import ResTransformer
 from modules.GeMPooling import GeMPooling 
 from modules.infonce_loss import InfoNCELoss
@@ -207,11 +208,6 @@ def create_dataloader(args, image_dim):
     meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
     transform = configure_transform(image_dim = image_dim, meta = meta)
 
-    # number of cached queries
-    # cached_queries = 60000
-    # number of cached negatives
-    # cached_negatives = 80000
-
     # whether to use positive sampling
     positive_sampling = True
     
@@ -325,12 +321,13 @@ def main():
     net_name = args.net_name
     net = get_net(net_name)
     
-    if net_name == "resnet50+gem" or "resvit":
+    if net_name == ("resnet50+gem" or "resvit"):
         # optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
         #                            {"params":net.base.parameters()}], 
         #                            lr=args.lr)
         optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
         image_dim = (480, 640)
+
     elif net_name == "vit":
         # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
         optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
@@ -339,6 +336,7 @@ def main():
     print(f"***************Load the {net_name} net sucessfully*********************\n")
 
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
+    print(image_dim)
     trainDataloader = create_dataloader(args, image_dim)
 
     print("\n***************Load the trainDataset sucessfully****************")
@@ -351,11 +349,12 @@ def main():
     # choose the loss function used to train the net
     if args.loss == "triplet":
         loss = TripletLoss(margin=0.1)
-        print(f"\n***************The loss is : Triplet Loss***********************")
 
     elif args.loss == "infonce":
         loss = InfoNCELoss(t=0.02)
-        print(f"\n***************The loss is : InfoNCE Loss***********************")
+
+    elif args.loss == "msloss":
+        loss = MultiSimilarityLoss(thresh=1, margin=0.1, scale_pos=2.0, scale_neg=50.0)
     
     print("\n******************we will start training************************")
 

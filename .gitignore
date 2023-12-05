@@ -12,3 +12,6 @@ train_im2im_loss_log/
 *.csv
 *.sh
 result*/
+*.pth
+
+demo*
