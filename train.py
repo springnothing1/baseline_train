@@ -16,11 +16,11 @@ import torchvision
 from torch import nn
 from pathlib import Path
 from d2l import torch as d2l
-from modules.msloss import MultiSimilarityLoss
+from modules.loss import InfoNCELoss
+from modules.loss import TripletLoss
+from modules.loss import MultiSimilarityLoss
 from modules.ResViT import ResTransformer
 from modules.GeMPooling import GeMPooling 
-from modules.infonce_loss import InfoNCELoss
-from modules.triplet_loss_cos import TripletLoss
 from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.utils.utils import configure_transform
 from torch.utils.data import DataLoader
@@ -70,7 +70,7 @@ def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, i
         
         optimizer.zero_grad()
         
-        l = loss(y_hat, q_seq_length, db_seq_length, N, device)
+        l = loss(y_hat, q_seq_length, db_seq_length)
         
         l.backward()
         optimizer.step()
