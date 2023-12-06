@@ -6,3 +6,5 @@ sklearn
 torch
 torchvision
 tqdm
+tensorboardX
+d2l

@@ -103,13 +103,13 @@ def save_evaluate(args, net, epoch, image_dim, i=999999, cities='cph,sf'):
     # predict and save the keys
     print(f'\nStart to predict the keys of cities: {cities}')
     predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}i{i}.csv")))
-    predict.main(net, task, image_dim, args.seq_length, predict_path, cities, args.predict_batch_size)
+    predict.main(args, net, task, image_dim, args.seq_length, predict_path, cities, args.predict_batch_size)
     print(f'save the prediction successfully!!')
 
     # evaluate the predictions above and save the results
     print(f'\nStart to evaluate the prediction of cities: {cities}')
     evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}i{i}.csv")))
-    evaluate.main(predict_path, evaluate_path, cities, task, args.seq_length)
+    evaluate.main(args, predict_path, evaluate_path, cities, task, args.seq_length)
     print(f'evaluate the model sucessfully! you can see the result in {outpath}\n')
 
 
@@ -336,7 +336,6 @@ def main():
     print(f"***************Load the {net_name} net sucessfully*********************\n")
 
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
-    print(image_dim)
     trainDataloader = create_dataloader(args, image_dim)
 
     print("\n***************Load the trainDataset sucessfully****************")
@@ -354,7 +353,7 @@ def main():
         loss = InfoNCELoss(t=0.02)
 
     elif args.loss == "msloss":
-        loss = MultiSimilarityLoss(thresh=1, margin=0.1, scale_pos=2.0, scale_neg=50.0)
+        loss = MultiSimilarityLoss(thresh=0.5, margin=0.1, scale_pos=2.0, scale_neg=50.0)
     
     print("\n******************we will start training************************")
 

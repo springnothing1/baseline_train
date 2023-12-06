@@ -37,6 +37,7 @@ class MultiSimilarityLoss(nn.Module):
     def forward(self, feats, q_length, *args):
         #assert feats.size(0) == labels.size(0), \
         #    f"feats.size(0): {feats.size(0)} is not equal to labels.size(0): {labels.size(0)}"
+        feats = feats / torch.norm(feats, dim=2, keepdim=True)
         sim_mats = torch.matmul(feats, feats.transpose(1, 2))
 
         epsilon = 1e-5
@@ -55,8 +56,6 @@ class MultiSimilarityLoss(nn.Module):
             neg_pair = neg_pair_[neg_pair_ + self.margin > min(pos_pair_)]
             pos_pair = pos_pair_[pos_pair_ - self.margin < max(neg_pair_)]
 
-            print(len(neg_pair))
-            print(len(pos_pair))
             if len(neg_pair) < 1 or len(pos_pair) < 1:
                 continue
 

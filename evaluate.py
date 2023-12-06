@@ -9,8 +9,8 @@ from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.utils.eval import eval, create_dummy_predictions, download_msls_sample
 
 
-def main(prediction, output=Path('./result/my.csv'), cities='zurich', task='im2im', seq_length=1, subtask='all'):
-    root_default = Path('/datasets/msls')
+def main(args, prediction, output=Path('./result/my.csv'), cities='zurich', task='im2im', seq_length=1, subtask='all'):
+    root_default = args.msls_root
 
     # Positive distance threshold defining ground truth pairs
     threshold = 25

@@ -177,9 +177,9 @@ def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_
     return val_dataset, qLoader, dbLoader
     
 
-def main(net, task, image_dim, seq_length, out_path, cities, batch_size):
+def main(args, net, task, image_dim, seq_length, out_path, cities, batch_size):
     # the location of msls_dataset in computer
-    root_dir = '/datasets/msls'
+    root_dir = args.msls_root
     device = list(net.parameters())[0].device
 
     # set the size of batch
