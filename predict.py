@@ -177,10 +177,13 @@ def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_
     return val_dataset, qLoader, dbLoader
     
 
-def main(args, net, task, image_dim, seq_length, out_path, cities, batch_size):
+def main(args, net, image_dim, out_path, cities):
     # the location of msls_dataset in computer
     root_dir = args.msls_root
     device = list(net.parameters())[0].device
+    seq_length = args.seq_length
+    task = args.task
+    batch_size = args.predict_batch_size
 
     # set the size of batch
     # batch_size = batch_size
@@ -188,25 +191,25 @@ def main(args, net, task, image_dim, seq_length, out_path, cities, batch_size):
     # create the datasets and dataloaders   (root_dir, cities, task, seq_length, batch_size)
     val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim)
 
-    print("***load the net successfully")
+    # print("***load the net successfully")
     # compute the feature of query and database 
     q_feature, q_idx = predict_feature(net, qLoader, device, task.split('2')[0])
     db_feature, _ = predict_feature(net, dbLoader, device, task.split('2')[1])
 
-    print("***compute the features of query and database successfully")
+    # print("***compute the features of query and database successfully")
 
     # compare the q_feature and db_feature and get the index of first 5 similar db_images
     # shape = (len(q_feature), 5)
     db_idx = query_to_dbIdx(q_feature, db_feature).cpu()
     q_idx = q_idx.cpu()
 
-    print("***find the regarding db_idx successfully")
+    # print("***find the regarding db_idx successfully")
 
     # find_keys according to the index(index, dataset, mode="query"/"database")
     db_keys = find_keys(db_idx, val_dataset.dbImages)
     q_keys = find_keys(q_idx, val_dataset.qImages)
 
-    print("***find the regarding db_keys successfully")
+    # print("***find the regarding db_keys successfully")
 
     # save the keys in rule
     save_to_csv(q_keys, db_keys, out_path)
@@ -269,7 +272,7 @@ if __name__ == "__main__":
     elif args.net_name == "vit":
         image_dim = (224, 224)
     # main(net, device, args.task, args.seq_length, args.output, args.cities, args.batch_size)
-    main(net, args.task, image_dim, args.seq_length, args.out_path, args.cities, args.batch_size)
+    main(args, net, image_dim, args.out_path, args.cities)
 
     # evaluate the predictions above and save the results
     # print(f'\nStart to evaluate the prediction of cities: {cities}')

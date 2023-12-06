@@ -27,6 +27,9 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
 
+# save the best recall@1
+RECALL_BEST = 0
+
 def get_net(net_name = "resnet50+gem"):
     """get the net of resnet50 with gempooling or ViT_base_16 """
     
@@ -55,66 +58,24 @@ def get_net(net_name = "resnet50+gem"):
     return net
 
 
-def train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, image_dim):
-    net.train()
-    metric = d2l.Accumulator(2)
-    for i, (sequences, labels) in enumerate(train_iter):
-        N = labels.shape[1]
-        q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
-        # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
-        s_shape = sequences.shape
-        X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(device)
-
-        y_hat = net(X)
-        y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
-        
-        optimizer.zero_grad()
-        
-        l = loss(y_hat, q_seq_length, db_seq_length)
-        
-        l.backward()
-        optimizer.step()
-        metric.add(l * sequences.shape[0], labels.numel())
-        
-        train_loss = metric[0] / metric[1]
-        
-        if (i % 1000 == 0) and (i != 0):
-            print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
-            niter = epoch * len(train_iter) + i
-            writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
-
-        if (i % 10000 == 0) and (i != 0):
-            # save the models and evaluate on val_cities
-            save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
-        
-    return train_loss
-
-
 def save_evaluate(args, net, epoch, image_dim, i=999999, cities='cph,sf'):
-    task = args.task
     outpath = args.out_path
-
-    """if i == 999999:
-        # save the model for each epoch
-        model_path = Path(os.path.join(outpath, Path(f"model_{task}_val_epoch{epoch + 1}i{i}.pt")))
-        torch.save(net.state_dict(), model_path)
-        print(f'save the net successfully!!')"""
 
     # predict and save the keys
     print(f'\nStart to predict the keys of cities: {cities}')
-    predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}i{i}.csv")))
-    predict.main(args, net, task, image_dim, args.seq_length, predict_path, cities, args.predict_batch_size)
+    predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}_i{i}.csv")))
+    predict.main(args, net, image_dim, predict_path, cities)
     print(f'save the prediction successfully!!')
 
     # evaluate the predictions above and save the results
     print(f'\nStart to evaluate the prediction of cities: {cities}')
-    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}i{i}.csv")))
-    evaluate.main(args, predict_path, evaluate_path, cities, task, args.seq_length)
-    print(f'evaluate the model sucessfully! you can see the result in {outpath}\n')
+    evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}_i{i}.csv")))
+    recall_1 = evaluate.main(args, predict_path, evaluate_path, cities)
+    print(f'evaluate the model sucessfully! you can see the result in {outpath}')
+    return recall_1
 
 
-
-def reload_checkpoint(args, net, optimizer, path_checkpoint):
+def reload_checkpoint(net, optimizer, path_checkpoint):
     # load the checkpoint
     checkpoint = torch.load(path_checkpoint)
 
@@ -135,9 +96,59 @@ def save_checkpoint(net, optimizer, epoch, loss, model_path):
     torch.save(checkpoint, model_path)
 
 
-def train(args, net, train_iter, loss, optimizer, device, image_dim):
+def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path):
+    net.train()
+    metric = d2l.Accumulator(2)
+    global RECALL_BEST
+    
+    for i, (sequences, labels) in enumerate(train_iter):
+        N = labels.shape[1]
+        q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
+        # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
+        s_shape = sequences.shape
+        X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(next(net.parameters()).device)
+
+        y_hat = net(X)
+        y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
+        
+        optimizer.zero_grad()
+        
+        l = loss(y_hat, q_seq_length, db_seq_length)
+        
+        l.backward()
+        optimizer.step()
+        metric.add(l * sequences.shape[0], labels.numel())
+        
+        train_loss = metric[0] / metric[1]
+        
+        if (i % 1000 == 0) and (i != 0):
+            print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
+            niter = epoch * len(train_iter) + i
+            writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
+
+        if (i % 10000 == 0) and (i != 0):
+            # evaluate on val_cities
+            recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
+            if recall_candidate > RECALL_BEST:
+                # save the best reall@1 in one epoch
+                RECALL_BEST = recall_candidate
+                # set checkpoint
+                save_checkpoint(net, optimizer, epoch, loss, model_path)
+                print(f'++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!')
+
+    print(f"epoch{epoch + 1} if end ")           
+    recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
+    if recall_candidate > RECALL_BEST:
+        # save the best reall@1 in one epoch
+        RECALL_BEST = recall_candidate
+        # set checkpoint
+        save_checkpoint(net, optimizer, epoch, loss, model_path)
+        print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!')
+    return train_loss
+
+
+def train(args, net, train_iter, loss, optimizer, image_dim):
     """train funtion"""
-    net.to(device)
     start_time = time.time()
     writer = SummaryWriter(args.loss_path)
     start_epoch = -1
@@ -145,34 +156,26 @@ def train(args, net, train_iter, loss, optimizer, device, image_dim):
     # create the path to save the models and evaluate results
     if not os.path.exists(args.out_path):
         os.makedirs(args.out_path)
-    model_path = Path(os.path.join(args.out_path, Path("model.pt")))
+    model_path = Path(os.path.join(args.out_path, Path("model_best.pt")))
 
     # reload the checkpoint if resume==True
     if args.resume:
-        net, optimizer, start_epoch, loss = reload_checkpoint(args, net, optimizer, model_path)
+        net, optimizer, start_epoch, loss = reload_checkpoint(net, optimizer, model_path)
 
     for epoch in range(start_epoch + 1, args.num_epochs):
-        
         epoch_start = time.time()
         print(f'\n\nepoch [{epoch + 1}/{args.num_epochs}] is start:')
         
-        # train for every epoch
-        train_loss = train_epoch(args, epoch, net, train_iter, device, optimizer, loss, writer, image_dim)
-
-        #set checkpoint
-        save_checkpoint(net, optimizer, epoch, loss, model_path)
-        print(f'save the net successfully!!')
-    
+        # train for every epoch and get the best recall@1
+        train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path)
+            
         # save the models and evaluate on train_cities
-        save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,tokyo,toronto')#'boston,manila')
-
-        # save the models and evaluate on val_cities
-        save_evaluate(args, net, epoch, image_dim, cities='cph,sf')
+        _ = save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,tokyo,toronto')
 
         # record the time
         epoch_end = time.time()
         print(f'epoch{epoch} is end')
-        print(f'\nnow loss:{train_loss:f}, time:{((epoch_end - epoch_start) / 60):.3}min ({((epoch_end - epoch_start) / 3600):.3} hours)\n')
+        print(f'now loss:{train_loss:f}, time:{((epoch_end - epoch_start) / 60):.3} min ({((epoch_end - epoch_start) / 3600):.3} hours)\n')
         print("****************************************************************")
     
     end_time = time.time()
@@ -333,17 +336,12 @@ def main():
         optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
         image_dim = (224, 224)
     
-    print(f"***************Load the {net_name} net sucessfully*********************\n")
-
+    print("\nloading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
     trainDataloader = create_dataloader(args, image_dim)
 
-    print("\n***************Load the trainDataset sucessfully****************")
-
     # choose the device to train the net
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
-
-    print(f"\n***************Trained on the {device}***************************")
 
     # choose the loss function used to train the net
     if args.loss == "triplet":
@@ -357,7 +355,8 @@ def main():
     
     print("\n******************we will start training************************")
 
-    train(args, net, trainDataloader, loss, optimizer, device, image_dim)
+    net.to(device)
+    train(args, net, trainDataloader, loss, optimizer, image_dim)
 
 
 if __name__ == "__main__":

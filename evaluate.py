@@ -9,8 +9,10 @@ from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.utils.eval import eval, create_dummy_predictions, download_msls_sample
 
 
-def main(args, prediction, output=Path('./result/my.csv'), cities='zurich', task='im2im', seq_length=1, subtask='all'):
+def main(args, prediction, output=Path('./result/my.csv'), cities='zurich', subtask='all'):
     root_default = args.msls_root
+    seq_length = args.seq_length
+    task = args.task
 
     # Positive distance threshold defining ground truth pairs
     threshold = 25
@@ -86,16 +88,20 @@ def main(args, prediction, output=Path('./result/my.csv'), cities='zurich', task
     f = open(output, 'a') if output else None
     # save metrics
     for metric in ['recall', 'map']:
-        for k in ks:
+        for i, k in enumerate(ks):
             line =  '{}_{}@{}: {:.3f}'.format(subtask,
                                               metric,
                                               k,
                                               metrics['{}@{}'.format(metric, k)])
             print(line)
+            if i == 0:
+                recall_1 = metrics['{}@{}'.format(metric, k)]
             if f:
                 f.write(line + '\n')
     if f:
         f.close()
+    return recall_1
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -136,4 +142,4 @@ if __name__ == "__main__":
                         default=None,
                         help='Path to dump the metrics to')
     args = parser.parse_args()
-    main(args.prediction, output=args.output, cities=args.cities, task=args.task, seq_length=args.seq_length, subtask=args.subtask)
+    recall_1 = main(args, args.prediction, output=args.output, cities=args.cities, subtask=args.subtask)
