@@ -8,3 +8,18 @@ torchvision
 tqdm
 tensorboardX
 d2l
+
+#--extra-index-url https://download.pytorch.org/whl/cu117
+#torch==2.0.0+cu117
+#torchvision==0.15.1+cu117
+fairscale
+sentencepiece
+opencv-python
+gradio
+git+https://github.com/csuhan/timm_0_3_2.git
+#git+https://github.com/openai/CLIP.git
+
+
+ftfy
+regex
+
