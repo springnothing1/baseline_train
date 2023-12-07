@@ -98,7 +98,6 @@ def write_key_seq(key_col, f):
 def save_to_csv(q_keys, db_keys, path):
     """save the keys in csv, seq_length q_keys match to 20*seq_length db_keys"""
     # create the csv saved keys
-    os.makedirs(os.path.join('.', 'files'), exist_ok=True)
     data_file = path
     
     with open(data_file, 'w') as f:

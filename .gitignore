@@ -15,3 +15,4 @@ train_im2im_loss_log/
 *.pth
 *.pt
 demo*
+*data/
