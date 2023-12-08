@@ -80,12 +80,12 @@ class LLaMA_adapter(nn.Module):
         self.criterion = torch.nn.CrossEntropyLoss(ignore_index=0)
 
         # 7. training parameters
-        self.phase = phase
+        """self.phase = phase
         self.get_trainable_params(self.phase)
 
         for name, param in self.named_parameters():
             if param.requires_grad:
-               print(f"Trainable param: {name}, {param.shape}, {param.dtype}")
+               print(f"Trainable param: {name}, {param.shape}, {param.dtype}")"""
 
     def get_trainable_params(self, phase='finetune'):
         for name, para in self.named_parameters():
@@ -308,7 +308,7 @@ def load(name, llama_dir, llama_type="7B", device=None, download_root='ckpts', m
 
     model = LLaMA_adapter(
         llama_ckpt_dir, llama_tokenzier_path,
-        max_seq_len=512, max_batch_size=1,
+        max_seq_len=512, max_batch_size=16,
         clip_model='ViT-L/14',
         v_embed_dim=768, v_depth=8,
         v_num_heads=16, v_mlp_ratio=4.0,

@@ -261,7 +261,7 @@ class CLIP(nn.Module):
                  transformer_heads: int,
                  transformer_layers: int,
                  #llama
-                 llama_model: torch.Module,
+                 llama_model,
                  prompts
                  ):
         super().__init__()
@@ -466,8 +466,8 @@ def tokenize(texts: Union[str, List[str]], context_length: int = 77, truncate: b
     return result
 
 
-def build_model(state_dict: dict, llama_ckpt_dir, 
-                llama_tokenzier_path, model_cfg,
+def build_model(state_dict, prompts,llama_ckpt_dir, 
+                llama_tokenzier_path, model_cfg, 
                 max_seq_len=512, phase="finetune"):
     vit = "visual.proj" in state_dict
 
@@ -514,13 +514,13 @@ def build_model(state_dict: dict, llama_ckpt_dir,
         embed_dim,
         image_resolution, vision_layers, vision_width, vision_patch_size,
         context_length, vocab_size, transformer_width, transformer_heads, transformer_layers,
-        llama_model
+        llama_model, prompts
     )
 
     for key in ["input_resolution", "context_length", "vocab_size"]:
         if key in state_dict:
             del state_dict[key]
 
-    convert_weights(model)
+    #convert_weights(model)
     # model.load_state_dict(state_dict)
     return model.eval()
