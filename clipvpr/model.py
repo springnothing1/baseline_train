@@ -376,8 +376,9 @@ class CLIPVPR(nn.Module):
         # get the image features
         image_features = self.encode_image(image)
 
-        # get the text description of image with llama
-        image_text = self.encode_llama(image)
+        with torch.no_grad():
+            # get the text description of image with llama
+            image_text = self.encode_llama(image)
 
         # get the tokens of text for clip_encode_text
         image_text_tokens = tokenize(image_text).to(image.device)
@@ -474,7 +475,10 @@ def build_model(state_dict, prompt,llama_ckpt_dir,
     for key in ["input_resolution", "context_length", "vocab_size"]:
         if key in state_dict:
             del state_dict[key]
+    
+    for param in model.llama_model.parameters():
+        param.requires_grad = False
 
     # convert_weights(model)
     # model.load_state_dict(state_dict)
-    return model.eval()
+    return model

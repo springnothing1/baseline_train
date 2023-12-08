@@ -131,7 +131,7 @@ def tokenize(texts: Union[str, List[str]], context_length: int = 77, truncate: b
 def _convert_image_to_rgb(image):
     return image.convert("RGB")
 
-def _transform(n_px):
+def transform(n_px):
     return Compose([
         Resize(n_px, interpolation=BICUBIC),
         CenterCrop(n_px),

@@ -12,6 +12,7 @@ import torch
 import predict
 import evaluate
 import argparse
+import clipvpr
 import torchvision
 from torch import nn
 from pathlib import Path
@@ -54,6 +55,11 @@ def get_net(net_name = "resnet50+gem"):
 
     elif net_name == "resvit":
         net = ResTransformer()
+        
+    elif net_name == "clipvpr":
+        model, process = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
+        llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
+        prompt=['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?'])
 
     return net
 
@@ -143,7 +149,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         RECALL_BEST = recall_candidate
         # set checkpoint
         save_checkpoint(net, optimizer, epoch, loss, model_path)
-        print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!')
+        print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!\n')
     return train_loss
 
 
@@ -170,7 +176,7 @@ def train(args, net, train_iter, loss, optimizer, image_dim):
         train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path)
             
         # save the models and evaluate on train_cities
-        _ = save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,tokyo,toronto')
+        _ = save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,boston')
 
         # record the time
         epoch_end = time.time()
@@ -204,12 +210,12 @@ def split_seq(sequences, N, task):
     return q_seq_length, db_seq_length
 
 
-def create_dataloader(args, image_dim):
+def create_dataloader(args, transform):
     """load the trainDataset"""
 
-    # get transform
+    """# get transform
     meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
-    transform = configure_transform(image_dim = image_dim, meta = meta)
+    transform = configure_transform(image_dim = image_dim, meta = meta)"""
 
     # whether to use positive sampling
     positive_sampling = True
@@ -324,21 +330,22 @@ def main():
     net_name = args.net_name
     net = get_net(net_name)
     
-    if net_name == ("resnet50+gem" or "resvit"):
-        # optimizer = torch.optim.Adam([{"params":net.back.parameters(),  "lr":args.lr * 10}, 
-        #                            {"params":net.base.parameters()}], 
-        #                            lr=args.lr)
-        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
+    optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    
+    if net_name in ["resnet50+gem", "resvit"]:
         image_dim = (480, 640)
+        # get transform
+        meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
+        transform = configure_transform(image_dim = image_dim, meta = meta)
+        
 
-    elif net_name == "vit":
-        # optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.03, betas=(0.9,0.999), eps=1e-08)
+    elif net_name in ["vit", "clipvpr"]:
         image_dim = (224, 224)
+        transform = clipvpr.transform(image_dim)
     
     print("\nloading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
-    trainDataloader = create_dataloader(args, image_dim)
+    trainDataloader = create_dataloader(args, transform)
 
     # choose the device to train the net
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")

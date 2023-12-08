@@ -6,7 +6,7 @@ import clip
 import llama
 import torch
 from PIL import Image
-from .utils import _llama_download, _clip_download, _transform
+from .utils import _llama_download, _clip_download, transform
 from .model import build_model
 
 try:
@@ -44,7 +44,7 @@ _LLAMA_MODELS = {
 }
 
 
-def load(clip_name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit: bool = False,
+def load(clip_name: str, jit: bool = False,
          clip_download_root: str = None,  llama_name = "BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
          llama_download_root='ckpts', max_seq_len=512, phase="finetune", prompt=["Please introduce this painting"]):
     
@@ -60,7 +60,7 @@ def load(clip_name: str, device: Union[str, torch.device] = "cuda" if torch.cuda
         # clip_state_dict = torch.load(opened_file, map_location="cpu")
         try:
             # loading JIT archive
-            clip_model = torch.jit.load(opened_file, map_location=device if jit else "cpu").eval()
+            clip_model = torch.jit.load(opened_file, map_location="cpu").eval()
             clip_state_dict = None
         except RuntimeError:
             # loading saved state dict
@@ -85,9 +85,9 @@ def load(clip_name: str, device: Union[str, torch.device] = "cuda" if torch.cuda
     # build the model of clipvpr with clip and llama
     model = build_model(clip_model.state_dict() if clip_state_dict is None else clip_state_dict,
                         prompt, llama_ckpt_dir,llama_tokenzier_path, ckpt, max_seq_len, phase)
-    if str(device) == "cpu":
-        model.float()
+    """if str(device) == "cpu":
+        model.float()"""
 
-    return model.to(device), _transform(model.visual.input_resolution)
+    return model, transform(model.visual.input_resolution)
 
     
