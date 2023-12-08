@@ -7,11 +7,7 @@ import llama
 import torch.nn.functional as F
 from torch import nn
 
-from pkg_resources import packaging
-from typing import Any, Union, List
-
-from clip.simple_tokenizer import SimpleTokenizer as _Tokenizer
-_tokenizer = _Tokenizer()
+from .utils import tokenize
 
 
 class Bottleneck(nn.Module):
@@ -246,7 +242,7 @@ class VisionTransformer(nn.Module):
         return x
 
 
-class CLIP(nn.Module):
+class CLIPVPR(nn.Module):
     def __init__(self,
                  embed_dim: int,
                  # vision
@@ -262,7 +258,7 @@ class CLIP(nn.Module):
                  transformer_layers: int,
                  #llama
                  llama_model,
-                 prompts
+                 prompt
                  ):
         super().__init__()
 
@@ -309,7 +305,7 @@ class CLIP(nn.Module):
         # llama 
         # self.llama, _ = llama.load("BIAS-7B", llama_dir="./path/to/LLaMA/", device=device)
         self.llama_model = llama_model
-        self.load_prompts = [llama.format_prompt(p) for p in prompts]
+        self.load_prompt = [llama.format_prompt(prompt)]
 
     def initialize_parameters(self):
         nn.init.normal_(self.token_embedding.weight, std=0.02)
@@ -356,7 +352,8 @@ class CLIP(nn.Module):
         return self.visual(image.type(self.dtype))
     
     def encode_llama(self, image):
-        return self.llama.generate(image, self.load_prompts, temperature=0.0, top_p=1.0)
+        prompts = self.load_prompt * image.shape[0]
+        return self.llama_model.generate(image, prompts, max_gen_len=77)#temperature=0.0, top_p=1.0)
 
     def encode_text(self, text):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
@@ -376,27 +373,26 @@ class CLIP(nn.Module):
         return x
 
     def forward(self, image):
+        # get the image features
         image_features = self.encode_image(image)
 
+        # get the text description of image with llama
         image_text = self.encode_llama(image)
 
-        image_text_tokens = tokenize(image_text)
+        # get the tokens of text for clip_encode_text
+        image_text_tokens = tokenize(image_text).to(image.device)
 
+        # get the text features
         text_features = self.encode_text(image_text_tokens)
-
-        """# normalized features
-        image_features = image_features / image_features.norm(dim=1, keepdim=True)
-        text_features = text_features / text_features.norm(dim=1, keepdim=True)
-
-        # cosine similarity as logits
-        logit_scale = self.logit_scale.exp()
-        logits_per_image = logit_scale * image_features @ text_features.t()
-        logits_per_text = logits_per_image.t()"""
-
-        # shape = [global_batch_size, global_batch_size]
-        # return logits_per_image, logits_per_text
         
-
+        # fuse the image feature and text feature
+        fused_feature = torch.cat((image_features, text_features),dim=-1)
+        
+        logit_scale = self.logit_scale.exp()
+        img_text_feature = logit_scale * fused_feature
+        
+        return img_text_feature
+        
 
 def convert_weights(model: nn.Module):
     """Convert applicable model parameters to fp16"""
@@ -422,53 +418,10 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 
-
-def tokenize(texts: Union[str, List[str]], context_length: int = 77, truncate: bool = False) -> Union[torch.IntTensor, torch.LongTensor]:
-    """
-    Returns the tokenized representation of given input string(s)
-
-    Parameters
-    ----------
-    texts : Union[str, List[str]]
-        An input string or a list of input strings to tokenize
-
-    context_length : int
-        The context length to use; all CLIP models use 77 as the context length
-
-    truncate: bool
-        Whether to truncate the text in case its encoding is longer than the context length
-
-    Returns
-    -------
-    A two-dimensional tensor containing the resulting tokens, shape = [number of input strings, context_length].
-    We return LongTensor when torch version is <1.8.0, since older index_select requires indices to be long.
-    """
-    if isinstance(texts, str):
-        texts = [texts]
-
-    sot_token = _tokenizer.encoder["<|startoftext|>"]
-    eot_token = _tokenizer.encoder["<|endoftext|>"]
-    all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token] for text in texts]
-    if packaging.version.parse(torch.__version__) < packaging.version.parse("1.8.0"):
-        result = torch.zeros(len(all_tokens), context_length, dtype=torch.long)
-    else:
-        result = torch.zeros(len(all_tokens), context_length, dtype=torch.int)
-
-    for i, tokens in enumerate(all_tokens):
-        if len(tokens) > context_length:
-            if truncate:
-                tokens = tokens[:context_length]
-                tokens[-1] = eot_token
-            else:
-                raise RuntimeError(f"Input {texts[i]} is too long for context length {context_length}")
-        result[i, :len(tokens)] = torch.tensor(tokens)
-
-    return result
-
-
-def build_model(state_dict, prompts,llama_ckpt_dir, 
-                llama_tokenzier_path, model_cfg, 
+def build_model(state_dict, prompt,llama_ckpt_dir, 
+                llama_tokenzier_path, ckpt, 
                 max_seq_len=512, phase="finetune"):
+    # load the parameters of clip
     vit = "visual.proj" in state_dict
 
     if vit:
@@ -494,11 +447,11 @@ def build_model(state_dict, prompts,llama_ckpt_dir,
     transformer_heads = transformer_width // 64
     transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks")))
 
-    
-
+    # load the llama model with pretrained parameters
+    model_cfg = ckpt.get('config', {})
     llama_model = llama.LLaMA_adapter(
         llama_ckpt_dir, llama_tokenzier_path,
-        max_seq_len=max_seq_len, max_batch_size=1,
+        max_seq_len=max_seq_len, max_batch_size=16,
         clip_model='ViT-L/14',
         v_embed_dim=768, v_depth=8,
         v_num_heads=16, v_mlp_ratio=4.0,
@@ -509,18 +462,19 @@ def build_model(state_dict, prompts,llama_ckpt_dir,
         w_new_gate=model_cfg.get('w_lora', False), # for compatibility
         phase=phase
         )
+    llama_model.load_state_dict(ckpt['model'], strict=False)
 
-    model = CLIP(
+    model = CLIPVPR(
         embed_dim,
         image_resolution, vision_layers, vision_width, vision_patch_size,
         context_length, vocab_size, transformer_width, transformer_heads, transformer_layers,
-        llama_model, prompts
+        llama_model, prompt
     )
 
     for key in ["input_resolution", "context_length", "vocab_size"]:
         if key in state_dict:
             del state_dict[key]
 
-    #convert_weights(model)
+    # convert_weights(model)
     # model.load_state_dict(state_dict)
     return model.eval()

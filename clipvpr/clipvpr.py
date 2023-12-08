@@ -1,6 +1,4 @@
-import hashlib
 import os
-import urllib
 import warnings
 from typing import Any, Union, List
 from pkg_resources import packaging
@@ -8,9 +6,7 @@ import clip
 import llama
 import torch
 from PIL import Image
-from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-from tqdm import tqdm
-from .utils import _llama_download,_clip_download
+from .utils import _llama_download, _clip_download, _transform
 from .model import build_model
 
 try:
@@ -50,28 +46,11 @@ _LLAMA_MODELS = {
 
 def load(clip_name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit: bool = False,
          clip_download_root: str = None,  llama_name = "BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
-         llama_download_root='ckpts', max_seq_len=512, phase="finetune", prompt="Please introduce this painting"):
-    """Load a CLIP model
-
-    Parameters
-    ----------
-    clip_name : str
-        A model clip_name listed by `clip.available_models()`, or the path to a model checkpoint containing the state_dict
-
-    device : Union[str, torch.device]
-        The device to put the loaded model
-
-    Returns
-    -------
-    model : torch.nn.Module
-        The CLIP model
-
-    preprocess : Callable[[PIL.Image], torch.Tensor]
-        A torchvision transform that converts a PIL image into a tensor that the returned model can take as its input
-    """
+         llama_download_root='ckpts', max_seq_len=512, phase="finetune", prompt=["Please introduce this painting"]):
+    
     # load clip
     if clip_name in _CLIP_MODELS:
-        model_path = _clip_download(_CLIP_MODELS[clip_name], clip_download_root or os.path.expanduser("./cache/clip"))
+        model_path = _clip_download(_CLIP_MODELS[clip_name], clip_download_root or os.path.expanduser("./ckpts/clip"))
     elif os.path.isfile(clip_name):
         model_path = clip_name
     else:
@@ -102,13 +81,13 @@ def load(clip_name: str, device: Union[str, torch.device] = "cuda" if torch.cuda
     llama_tokenzier_path = os.path.join(llama_dir, 'tokenizer.model')
     
     ckpt = torch.load(model_path, map_location='cpu')
-    model_cfg = ckpt.get('config', {})
-
+    
+    # build the model of clipvpr with clip and llama
     model = build_model(clip_model.state_dict() if clip_state_dict is None else clip_state_dict,
-                        prompt, llama_ckpt_dir,llama_tokenzier_path,model_cfg, max_seq_len, phase)
+                        prompt, llama_ckpt_dir,llama_tokenzier_path, ckpt, max_seq_len, phase)
     if str(device) == "cpu":
         model.float()
 
-    return model.to(device)#, clip._transform(model.visual.input_resolution)
+    return model.to(device), _transform(model.visual.input_resolution)
 
     
