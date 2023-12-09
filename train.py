@@ -57,7 +57,7 @@ def get_net(net_name = "resnet50+gem"):
         net = ResTransformer()
         
     elif net_name == "clipvpr":
-        model, process = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
+        net, process = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
         llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
         prompt=['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?'])
 
