@@ -83,10 +83,10 @@ def save_evaluate(args, net, epoch, image_dim, i=999999, cities='cph,sf'):
 
 def reload_checkpoint(net, optimizer, path_checkpoint):
     # load the checkpoint
-    checkpoint = torch.load(path_checkpoint)
+    checkpoint = torch.load(path_checkpoint, map_location='cpu')
 
     start_epoch = checkpoint['epoch']
-    net.load_state_dict(checkpoint['net'], map_location='cpu')
+    net.load_state_dict(checkpoint['net'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     loss = checkpoint['loss']
 
@@ -358,7 +358,7 @@ def main():
         loss = InfoNCELoss(t=0.02)
 
     elif args.loss == "msloss":
-        loss = MultiSimilarityLoss(thresh=0.5, margin=0.1, scale_pos=2.0, scale_neg=50.0)
+        loss = MultiSimilarityLoss(thresh=0.5, margin=0.1, scale_pos=2.0, scale_neg=40.0)
     
     print("\n******************we will start training************************")
 
