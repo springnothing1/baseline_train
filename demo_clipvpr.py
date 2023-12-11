@@ -25,6 +25,7 @@ def main():
     result = model(img_load)
     
     print(result.shape)
+    print(model)
 
 
 if __name__ == "__main__":

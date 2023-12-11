@@ -353,7 +353,10 @@ class CLIPVPR(nn.Module):
     
     def encode_llama(self, image):
         prompts = self.load_prompt * image.shape[0]
-        return self.llama_model.generate(image, prompts, max_gen_len=77)#temperature=0.0, top_p=1.0)
+        self.llama_model.eval()
+        with torch.no_grad():
+            text = self.llama_model.generate(image, prompts, max_gen_len=77)#temperature=0.0, top_p=1.0)
+        return text
 
     def encode_text(self, text):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
@@ -376,9 +379,8 @@ class CLIPVPR(nn.Module):
         # get the image features
         image_features = self.encode_image(image)
 
-        with torch.no_grad():
-            # get the text description of image with llama
-            image_text = self.encode_llama(image)
+        # get the text description of image with llama
+        image_text = self.encode_llama(image)
 
         # get the tokens of text for clip_encode_text
         image_text_tokens = tokenize(image_text).to(image.device)

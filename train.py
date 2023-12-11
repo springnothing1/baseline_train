@@ -103,11 +103,11 @@ def save_checkpoint(net, optimizer, epoch, loss, model_path):
 
 
 def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path):
-    net.train()
     metric = d2l.Accumulator(2)
     global RECALL_BEST
     
     for i, (sequences, labels) in enumerate(train_iter):
+        net.train()
         N = labels.shape[1]
         q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
         # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
@@ -140,7 +140,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
                 RECALL_BEST = recall_candidate
                 # set checkpoint
                 save_checkpoint(net, optimizer, epoch, loss, model_path)
-                print(f'++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!')
+                print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!\n')
 
     print(f"epoch{epoch + 1} if end ")           
     recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
@@ -330,7 +330,12 @@ def main():
     net_name = args.net_name
     net = get_net(net_name)
     
-    optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    #optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    if net_name == "clipvpr":
+        optimizer = torch.optim.AdamW(filter(lambda p : p.requires_grad, net.parameters()), 
+                                      lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    else:
+        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     
     if net_name in ["resnet50+gem", "resvit"]:
         image_dim = (480, 640)
