@@ -4,15 +4,8 @@ import llama
 import torch
 from PIL import Image
 import torch
-import predict
-import evaluate
-import argparse
-import torchvision
-from torch import nn
 from pathlib import Path
 from mapillary_sls.datasets.msls import MSLS
-from mapillary_sls.utils.utils import configure_transform
-from torch.utils.data import DataLoader
 
 
 def data_iter(batch_size, data):
