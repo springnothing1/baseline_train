@@ -9,6 +9,7 @@
 import os
 import time
 import torch
+import clip
 import argparse
 import clipvpr
 import torchvision
@@ -20,6 +21,7 @@ from modules.loss import InfoNCELoss,TripletLoss, MultiSimilarityLoss
 from modules.ResViT import ResTransformer
 from modules.GeMPooling import GeMPooling 
 from mapillary_sls.datasets.msls import MSLS
+from mapillary_sls.datasets.msls_clip import MSLSCLIP
 from mapillary_sls.utils.utils import configure_transform
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
@@ -57,6 +59,9 @@ def get_net(net_name = "resnet50+gem"):
         net, _ = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
         llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
         prompt=['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?'])
+    
+    elif net_name == "clip":
+        net, _= clip.load("ViT-B/16")
 
     return net
 
@@ -65,15 +70,15 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
     metric = d2l.Accumulator(2)
     global RECALL_BEST
     
-    for i, (sequences, labels) in enumerate(train_iter):
+    for i, (sequences, texts) in enumerate(train_iter):
         net.train()
-        N = labels.shape[1]
+        N = 2 + args.num_negatives
         q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
         # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
         s_shape = sequences.shape
-        X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(next(net.parameters()).device)
-
-        y_hat = net(X)
+        images = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(next(net.parameters()).device)
+        texts = texts.reshape(-1, texts.shape[-1]).to(next(net.parameters()).device)
+        y_hat = net(images, texts)
         y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
         
         optimizer.zero_grad()
@@ -82,7 +87,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         
         l.backward()
         optimizer.step()
-        metric.add(l * sequences.shape[0], labels.numel())
+        metric.add(l * sequences.shape[0], N)
         
         train_loss = metric[0] / metric[1]
         
@@ -152,18 +157,29 @@ def train(args, net, train_iter, loss, optimizer, image_dim):
     print(f'in the end, cost time:{all_time // 3600}hours, loss:{train_loss:f}')
 
 
-def create_dataloader(args, transform):
+def create_dataloader(args):
     """load the trainDataset"""
 
     """# get transform
     meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
     transform = configure_transform(image_dim = image_dim, meta = meta)"""
+    
+    if args.net_name in ["resnet50+gem", "resvit"]:
+        image_dim = (480, 640)
+        # get transform
+        meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
+        transform = configure_transform(image_dim = image_dim, meta = meta)
+        
+
+    elif args.net_name in ["vit", "clipvpr", "clip"]:
+        image_dim = (224, 224)
+        transform = clipvpr.transform(image_dim)
 
     # whether to use positive sampling
     positive_sampling = True
     
     # return the train dataset
-    train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
+    train_dataset = MSLSCLIP(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
                         posDistThr = 5, nNeg = args.num_negatives, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
@@ -180,7 +196,7 @@ def create_dataloader(args, transform):
     opt = {'batch_size': args.batch_size, 'shuffle': True}
     trainDataloader = DataLoader(train_dataset, **opt)
     
-    return trainDataloader
+    return trainDataloader, image_dim
     
 
 def main():
@@ -279,20 +295,9 @@ def main():
     else:
         optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     
-    if net_name in ["resnet50+gem", "resvit"]:
-        image_dim = (480, 640)
-        # get transform
-        meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
-        transform = configure_transform(image_dim = image_dim, meta = meta)
-        
-
-    elif net_name in ["vit", "clipvpr"]:
-        image_dim = (224, 224)
-        transform = clipvpr.transform(image_dim)
-    
     print("\nloading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
-    trainDataloader = create_dataloader(args, transform)
+    trainDataloader, image_dim = create_dataloader(args)
 
     # choose the device to train the net
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
