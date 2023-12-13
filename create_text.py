@@ -22,11 +22,10 @@ def llama_create_save(data_iter, city, transform, model, path, prompt_load, devi
     count = 0
     results = []
     print("\n=====>city:" + city + " query start:")
-    for i, images in enumerate(data_iter):
+    for images in data_iter:
         imgs = torch.stack([transform(Image.fromarray(cv2.imread(im))) for im in images], dim=0).to(device)
         prompts = imgs.shape[0] * prompt_load
         results.extend(model.generate(imgs, prompts, max_gen_len=77))
-        print(results[0])
         count += imgs.shape[0]
         if count % 100 == 0:
             print(f"======create {count}/{num} images description already!!")
