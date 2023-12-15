@@ -17,11 +17,11 @@ def data_iter(batch_size, data):
         end = min((i + 1) * batch_size, len(data))
         yield data[start: end]
 
-def llama_create_save(data_iter, city, transform, model, path, prompt_load, device, num):
+def llama_create_save(data_iter, city, transform, model, path, prompt_load, device, num, task):
     # len_iter = sum([1 for _ in data_iter])
     count = 0
     results = []
-    print("\n=====>city:" + city + " query start:")
+    print("\n=====>city:" + city + " " + task + " start:")
     for images in data_iter:
         imgs = torch.stack([transform(Image.fromarray(cv2.imread(im))) for im in images], dim=0).to(device)
         prompts = imgs.shape[0] * prompt_load
@@ -45,9 +45,10 @@ def main():
     model.eval().to(device)
     prompt = ['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?']
     prompt_load = [llama.format_prompt(prompt)]
-    
-    #cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,berlin,ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
-    cities = "amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,berlin,ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
+    # bangkok,melbourne，berlin
+    #cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,,berlin,ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
+    # cities = "ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
+    cities = "sf,cph".split(',')
     root_dir = Path('/root/autodl-tmp/msls').absolute()
     
     for city in cities:
@@ -63,8 +64,8 @@ def main():
         query_path = os.path.join(root_dir, 'train_val', city, "query", "descriptions.txt")
         database_path = os.path.join(root_dir, 'train_val', city, "database", "descriptions.txt")
         # create text description and save 
-        llama_create_save(q_data_iter, city, transform, model, query_path, prompt_load, device, len(train_dataset.qImages))
-        llama_create_save(db_data_iter, city, transform, model, database_path, prompt_load, device, len(train_dataset.dbImages))
+        llama_create_save(q_data_iter, city, transform, model, query_path, prompt_load, device, len(train_dataset.qImages), "query")
+        llama_create_save(db_data_iter, city, transform, model, database_path, prompt_load, device, len(train_dataset.dbImages), "database")
         
         print("=====>city:" + city + " end:\n")         
                 

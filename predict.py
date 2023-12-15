@@ -47,6 +47,39 @@ def predict_feature(net, Loader, device, im_or_seq='im'):
     return result, idx
 
 
+def predict_clip_feature(net, Loader, device, im_or_seq='im'):
+    """compute the features with net trained and get indices"""
+    net.to(device)
+    net.eval()
+    result = []
+    idx = []
+    with torch.no_grad():
+        if im_or_seq == 'im':
+
+            for x, y in Loader:
+                x = x.to(device)
+                y_hat = net(x, y)
+                result.append(y_hat)
+                idx.append(y)
+        elif im_or_seq == 'seq':
+            # type(x_list)=list, and len(x_list=seq_length)
+            for x_list, y in Loader:
+                y_hat_list = torch.zeros((x_list[0].shape[0], net.back[1].out_features)).to(device)
+                seq_length = len(x_list)
+                for x in x_list:
+                    # now the shape of x is(batch_size, 3, 224, 224)
+                    x = x.to(device)
+                    y_hat = net(x)
+                    # compute the mean of all images in the seq
+                    y_hat_list += y_hat
+                y_hat = y_hat_list / seq_length
+                result.append(y_hat)
+                idx.append(y)
+    result = torch.cat(result, dim=0)
+    idx = torch.cat(idx, dim=0).reshape(-1, 1)
+    return result, idx  
+    
+
 def query_to_dbIdx(qfeature, dbfeature):
     """find the first 20 most similar db_index to each query"""
     # for L2 norm:
@@ -191,9 +224,13 @@ def main(args, net, image_dim, out_path, cities):
     val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim)
 
     # print("***load the net successfully")
-    # compute the feature of query and database 
-    q_feature, q_idx = predict_feature(net, qLoader, device, task.split('2')[0])
-    db_feature, _ = predict_feature(net, dbLoader, device, task.split('2')[1])
+    # compute the feature of query and database
+    if args.net_name == "clip":
+        q_feature, q_idx = predict_clip_feature(net, qLoader, device, task.split('2')[0])
+        db_feature, _ = predict_clip_feature(net, dbLoader, device, task.split('2')[1])
+    else:
+        q_feature, q_idx = predict_feature(net, qLoader, device, task.split('2')[0])
+        db_feature, _ = predict_feature(net, dbLoader, device, task.split('2')[1])
 
     # print("***compute the features of query and database successfully")
 
