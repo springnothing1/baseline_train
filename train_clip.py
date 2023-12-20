@@ -83,7 +83,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         
         optimizer.zero_grad()
         
-        l = loss(y_hat, q_seq_length, db_seq_length)
+        l = loss(y_hat, q_seq_length, db_seq_length, N)
         
         l.backward()
         optimizer.step()
@@ -91,12 +91,12 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         
         train_loss = metric[0] / metric[1]
         
-        if (i % 1000 == 0) and (i != 0):
+        if (i % 100 == 0) and (i != 0):
             print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
 
-        if (i % 10000 == 0) and (i != 0):
+        if (i % 100 == 0) and (i != 0):
             # evaluate on val_cities
             recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
             if recall_candidate > RECALL_BEST:
@@ -248,7 +248,7 @@ def main():
     parser.add_argument('--loss',
                         type=str,
                         default="triplet",
-                        help='choose loss function: triplet or infonce')
+                        help='choose loss function: triplet or infonce or msloss')
     parser.add_argument('--resume',
                         type=bool,
                         default=False,

@@ -78,7 +78,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         
         optimizer.zero_grad()
         
-        l = loss(y_hat, q_seq_length, db_seq_length)
+        l = loss(y_hat, q_seq_length, db_seq_length, N)
         
         l.backward()
         optimizer.step()
@@ -232,7 +232,7 @@ def main():
     parser.add_argument('--loss',
                         type=str,
                         default="triplet",
-                        help='choose loss function: triplet or infonce')
+                        help='choose loss function: triplet or infonce or msloss')
     parser.add_argument('--resume',
                         type=bool,
                         default=False,

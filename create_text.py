@@ -47,8 +47,8 @@ def main():
     prompt_load = [llama.format_prompt(prompt)]
     # bangkok,melbourne，berlin
     #cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,,berlin,ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
-    # cities = "ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
-    cities = "sf,cph".split(',')
+    cities = "ottawa,phoenix,goa,amman,nairobi,manila".split(",")
+    # cities = "sf,cph".split(',')
     root_dir = Path('/root/autodl-tmp/msls').absolute()
     
     for city in cities:

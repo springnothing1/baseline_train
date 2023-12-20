@@ -7,7 +7,8 @@ from modules.GeMPooling import GeMPooling
 from torch import nn
 from pathlib import Path
 from mapillary_sls.datasets.msls import MSLS
-from mapillary_sls.datasets.generic_dataset import ImagesFromList
+from mapillary_sls.datasets.msls_clip import MSLSCLIP
+from mapillary_sls.datasets.generic_dataset import ImagesFromList, ImagesText
 from mapillary_sls.utils.utils import configure_transform
 from torch.utils.data import DataLoader
 
@@ -56,9 +57,10 @@ def predict_clip_feature(net, Loader, device, im_or_seq='im'):
     with torch.no_grad():
         if im_or_seq == 'im':
 
-            for x, y in Loader:
-                x = x.to(device)
-                y_hat = net(x, y)
+            for img_txt, y in Loader:
+                x, text = img_txt
+                x, text = x.to(device), text.reshape(-1, text.shape[-1]).to(device)
+                y_hat = net(x, text)
                 result.append(y_hat)
                 idx.append(y)
         elif im_or_seq == 'seq':
@@ -182,7 +184,7 @@ def load_net(path=None, net_name=None):
 
     return net
 
-def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim):
+def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim, args):
 
     # get transform
     meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
@@ -194,14 +196,23 @@ def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_
     # choose subtask to test on [all, s2w, w2s, o2n, n2o, d2n, n2d]
     subtask = 'all'
 
-    val_dataset = MSLS(root_dir, cities = cities, transform = transform, mode = 'test',
+    if args.net_name == "clip":
+        
+        val_dataset = MSLSCLIP(root_dir, cities = cities, transform = transform, mode = 'test',
+                        task = task, seq_length = seq_length, subtask = subtask, posDistThr = posDistThr)
+        
+        opt = {'batch_size': batch_size}
+        # get images
+        qLoader = DataLoader(ImagesText(val_dataset, transform), **opt)
+        dbLoader = DataLoader(ImagesText(val_dataset, transform), **opt)
+    else:
+        val_dataset = MSLS(root_dir, cities = cities, transform = transform, mode = 'test',
                     task = task, seq_length = seq_length, subtask = subtask, posDistThr = posDistThr)
     
-    opt = {'batch_size': batch_size}
-
-    # get images
-    qLoader = DataLoader(ImagesFromList(val_dataset.qImages[val_dataset.qIdx], transform), **opt)
-    dbLoader = DataLoader(ImagesFromList(val_dataset.dbImages, transform), **opt)
+        opt = {'batch_size': batch_size}
+        # get images
+        qLoader = DataLoader(ImagesFromList(val_dataset.qImages[val_dataset.qIdx], transform), **opt)
+        dbLoader = DataLoader(ImagesFromList(val_dataset.dbImages, transform), **opt)
 
     # get positive index (we allow some more slack: default 25 m)
     # pIdx = val_dataset.pIdx
@@ -221,7 +232,7 @@ def main(args, net, image_dim, out_path, cities):
     # batch_size = batch_size
 
     # create the datasets and dataloaders   (root_dir, cities, task, seq_length, batch_size)
-    val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim)
+    val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim, args)
 
     # print("***load the net successfully")
     # compute the feature of query and database

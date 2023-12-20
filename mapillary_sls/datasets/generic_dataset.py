@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 import pandas as pd
 from os.path import join
 from sklearn.neighbors import NearestNeighbors
+import clip
 import math
 import torch
 import random
@@ -13,11 +14,11 @@ import random
 class ImagesFromList(Dataset):
 	def __init__(self, images, transform):
 
-	    self.images = np.asarray(images)
-	    self.transform = transform
+		self.images = np.asarray(images)
+		self.transform = transform
 
 	def __len__(self):
-	    return len(self.images)
+		return len(self.images)
 
 	def __getitem__(self, idx):
 
@@ -28,3 +29,27 @@ class ImagesFromList(Dataset):
 			img = img[0]
 
 		return img, idx
+
+
+class ImagesText(Dataset):
+	def __init__(self, dataset, transform):
+
+		self.images = np.asarray(dataset.qImages[dataset.qIdx])
+		self.texts = np.asarray(dataset.qText[dataset.qIdx])
+		self.transform = transform
+
+	def __len__(self):
+		return len(self.images)
+
+	def __getitem__(self, idx):
+
+		img = [Image.open(im) for im in self.images[idx].split(",")]
+		img = [self.transform(im) for im in img]
+		
+		text = [self.texts[idx]]
+
+		if len(img) == 1:
+			img = img[0]
+
+		return (img, clip.tokenize(text)), idx
+
