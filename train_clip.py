@@ -96,7 +96,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_pat
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
 
-        if (i % 1000 == 0) and (i != 0):
+        if (i % 10000 == 0) and (i != 0):
             # evaluate on val_cities
             recall_candidate = save_evaluate(args, net, epoch, i, cities='cph,sf')
             if recall_candidate > RECALL_BEST:
@@ -140,7 +140,7 @@ def train(args, net, train_iter, loss, optimizer):
         train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_path)
             
         # save the models and evaluate on train_cities
-        _ = save_evaluate(args, net, epoch, cities='trondheim,london,boston')
+        # _ = save_evaluate(args, net, epoch, cities='trondheim,london,boston')
 
         # record the time
         epoch_end = time.time()
