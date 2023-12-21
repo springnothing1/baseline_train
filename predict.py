@@ -9,7 +9,7 @@ from pathlib import Path
 from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.datasets.msls_clip import MSLSCLIP
 from mapillary_sls.datasets.generic_dataset import ImagesFromList, ImagesText
-from mapillary_sls.utils.utils import configure_transform
+from mapillary_sls.utils.utils import configure_transform, clip_transform
 from torch.utils.data import DataLoader
 
 
@@ -184,11 +184,26 @@ def load_net(path=None, net_name=None):
 
     return net
 
-def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim, args):
-
+def create_dataset_loader(cities, args):
+    # the location of msls_dataset in computer
+    root_dir = args.msls_root
+    seq_length = args.seq_length
+    task = args.task
+    batch_size = args.predict_batch_size
+    
     # get transform
-    meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
-    transform = configure_transform(image_dim = image_dim, meta = meta)
+    """meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
+    transform = configure_transform(image_dim = image_dim, meta = meta)"""
+    if args.net_name in ["resnet50+gem", "resvit"]:
+        image_dim = (480, 640)
+        # get transform
+        meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
+        transform = configure_transform(image_dim = image_dim, meta = meta)
+        
+
+    elif args.net_name in ["vit", "clip","clipvpr"]:
+        image_dim = (224, 224)
+        transform = clip_transform(image_dim)
 
     # positive are defined within a radius of 25 m 阳性定义在25米的半径范围内
     posDistThr = 25
@@ -220,19 +235,16 @@ def create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_
     return val_dataset, qLoader, dbLoader
     
 
-def main(args, net, image_dim, out_path, cities):
+def main(args, net, out_path, cities):
     # the location of msls_dataset in computer
-    root_dir = args.msls_root
     device = list(net.parameters())[0].device
-    seq_length = args.seq_length
     task = args.task
-    batch_size = args.predict_batch_size
 
     # set the size of batch
     # batch_size = batch_size
 
     # create the datasets and dataloaders   (root_dir, cities, task, seq_length, batch_size)
-    val_dataset, qLoader, dbLoader = create_dataset_loader(root_dir, cities, task, seq_length, batch_size, image_dim, args)
+    val_dataset, qLoader, dbLoader = create_dataset_loader(cities, args)
 
     # print("***load the net successfully")
     # compute the feature of query and database
@@ -313,13 +325,8 @@ if __name__ == "__main__":
     device = torch.device(args.cuda if torch.cuda.is_available() else "cup")
 
     net.to(device)
-    # image_dim = (224, 224)
-    if args.net_name == "resnet50+gem":
-        image_dim = (480, 640)
-    elif args.net_name == "vit":
-        image_dim = (224, 224)
     # main(net, device, args.task, args.seq_length, args.output, args.cities, args.batch_size)
-    main(args, net, image_dim, args.out_path, args.cities)
+    main(args, net, args.out_path, args.cities)
 
     # evaluate the predictions above and save the results
     # print(f'\nStart to evaluate the prediction of cities: {cities}')

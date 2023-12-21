@@ -22,7 +22,7 @@ from modules.ResViT import ResTransformer
 from modules.GeMPooling import GeMPooling 
 from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.datasets.msls_clip import MSLSCLIP
-from mapillary_sls.utils.utils import configure_transform
+from mapillary_sls.utils.utils import configure_transform, clip_transform
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 
@@ -66,7 +66,7 @@ def get_net(net_name = "resnet50+gem"):
     return net
 
 
-def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path):
+def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_path):
     metric = d2l.Accumulator(2)
     global RECALL_BEST
     
@@ -91,14 +91,14 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
         
         train_loss = metric[0] / metric[1]
         
-        if (i % 100 == 0) and (i != 0):
+        if (i % 1000 == 0) and (i != 0):
             print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
 
-        if (i % 100 == 0) and (i != 0):
+        if (i % 10000 == 0) and (i != 0):
             # evaluate on val_cities
-            recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
+            recall_candidate = save_evaluate(args, net, epoch, i, cities='cph,sf')
             if recall_candidate > RECALL_BEST:
                 # save the best reall@1 in one epoch
                 RECALL_BEST = recall_candidate
@@ -107,7 +107,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
                 print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!\n')
 
     print(f"epoch{epoch + 1} if end ")           
-    recall_candidate = save_evaluate(args, net, epoch, image_dim, i, cities='cph,sf')
+    recall_candidate = save_evaluate(args, net, epoch, i, cities='cph,sf')
     if recall_candidate > RECALL_BEST:
         # save the best reall@1 in one epoch
         RECALL_BEST = recall_candidate
@@ -117,7 +117,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim
     return train_loss
 
 
-def train(args, net, train_iter, loss, optimizer, image_dim):
+def train(args, net, train_iter, loss, optimizer):
     """train funtion"""
     start_time = time.time()
     writer = SummaryWriter(args.loss_path)
@@ -137,10 +137,10 @@ def train(args, net, train_iter, loss, optimizer, image_dim):
         print(f'\n\nepoch [{epoch + 1}/{args.num_epochs}] is start:')
         
         # train for every epoch and get the best recall@1
-        train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, image_dim, model_path)
+        train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_path)
             
         # save the models and evaluate on train_cities
-        _ = save_evaluate(args, net, epoch, image_dim, cities='trondheim,london,boston')
+        _ = save_evaluate(args, net, epoch, cities='trondheim,london,boston')
 
         # record the time
         epoch_end = time.time()
@@ -171,9 +171,9 @@ def create_dataloader(args):
         transform = configure_transform(image_dim = image_dim, meta = meta)
         
 
-    elif args.net_name in ["vit", "clipvpr", "clip"]:
+    elif args.net_name in ["vit", "clip","clipvpr"]:
         image_dim = (224, 224)
-        transform = clipvpr.transform(image_dim)
+        transform = clip_transform(image_dim)
 
     # whether to use positive sampling
     positive_sampling = True
@@ -196,7 +196,7 @@ def create_dataloader(args):
     opt = {'batch_size': args.batch_size, 'shuffle': True}
     trainDataloader = DataLoader(train_dataset, **opt)
     
-    return trainDataloader, image_dim
+    return trainDataloader
     
 
 def main():
@@ -297,7 +297,7 @@ def main():
     
     print("\nloading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
-    trainDataloader, image_dim = create_dataloader(args)
+    trainDataloader = create_dataloader(args)
 
     # choose the device to train the net
     device = torch.device(args.cuda if torch.cuda.is_available() else "cpu")
@@ -315,7 +315,7 @@ def main():
     print("\n******************we will start training************************")
 
     net.to(device)
-    train(args, net, trainDataloader, loss, optimizer, image_dim)
+    train(args, net, trainDataloader, loss, optimizer)
 
 
 if __name__ == "__main__":

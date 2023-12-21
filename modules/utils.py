@@ -3,15 +3,15 @@ import torch
 from pathlib import Path
 import predict
 import evaluate
+    
 
-
-def save_evaluate(args, net, epoch, image_dim, i=999999, cities='cph,sf'):
+def save_evaluate(args, net, epoch, i=999999, cities='cph,sf'):
     outpath = args.out_path
 
     # predict and save the keys
     print(f'\nStart to predict the keys of cities: {cities}')
     predict_path = Path(os.path.join(outpath, Path(f"prediction_{cities}_val_epoch{epoch + 1}_i{i}.csv")))
-    predict.main(args, net, image_dim, predict_path, cities)
+    predict.main(args, net, predict_path, cities)
     print(f'save the prediction successfully!!')
 
     # evaluate the predictions above and save the results

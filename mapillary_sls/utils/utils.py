@@ -3,6 +3,15 @@
 from torchvision import transforms
 import torch
 
+from PIL import Image
+from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
+
+try:
+    from torchvision.transforms import InterpolationMode
+    BICUBIC = InterpolationMode.BICUBIC
+except ImportError:
+    BICUBIC = Image.BICUBIC
+    
 def configure_transform(image_dim, meta):
 
 	# transforms.Normalize用均值和标准差归一化张量图像
@@ -16,3 +25,16 @@ def configure_transform(image_dim, meta):
 	])
 
 	return transform
+
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+def clip_transform(n_px):
+    return Compose([
+        Resize(n_px, interpolation=BICUBIC),
+        CenterCrop(n_px),
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+    ])
