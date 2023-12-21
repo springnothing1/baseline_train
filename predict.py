@@ -218,8 +218,8 @@ def create_dataset_loader(cities, args):
         
         opt = {'batch_size': batch_size}
         # get images
-        qLoader = DataLoader(ImagesText(val_dataset, transform), **opt)
-        dbLoader = DataLoader(ImagesText(val_dataset, transform), **opt)
+        qLoader = DataLoader(ImagesText(val_dataset.qImages[val_dataset.qIdx], val_dataset.qText[val_dataset.qIdx], transform), **opt)
+        dbLoader = DataLoader(ImagesText(val_dataset.dbImages, val_dataset.dbText, transform), **opt)
     else:
         val_dataset = MSLS(root_dir, cities = cities, transform = transform, mode = 'test',
                     task = task, seq_length = seq_length, subtask = subtask, posDistThr = posDistThr)

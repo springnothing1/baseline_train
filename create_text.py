@@ -46,18 +46,24 @@ def main():
     prompt = ['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?']
     prompt_load = [llama.format_prompt(prompt)]
     # bangkok,melbourne，berlin
-    #cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,,berlin,ottawa,phoenix,goa,amman,nairobi,manila,cph,sf".split(",")
-    cities = "ottawa,phoenix,goa,amman,nairobi,manila".split(",")
+    cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,,berlin,ottawa,phoenix,goa,amman,nairobi,manila".split(",")
+    # cities = "ottawa,phoenix,goa,amman,nairobi,manila".split(",")
     # cities = "sf,cph".split(',')
     root_dir = Path('/root/autodl-tmp/msls').absolute()
     
     for city in cities:
         print("\n=====>city:" + city + " start:")
         # return the train dataset
-        train_dataset = MSLS(root_dir, cities = city, transform = transform, mode = 'train', 
-                            task = "im2im", seq_length = 1,negDistThr = 25, 
-                            posDistThr = 5, nNeg = 5, cached_queries = 60, 
-                            cached_negatives = 60, positive_sampling = True)
+        """"""
+        
+        if city in ["sf", "cph"]:
+            train_dataset = MSLS(root_dir, cities = city, transform = transform, mode = 'test',
+                                 task = "im2im", seq_length = 1, subtask = 'all', posDistThr = 5)
+        else:
+            train_dataset = MSLS(root_dir, cities = city, transform = transform, mode = 'train', 
+                                 task = "im2im", seq_length = 1,negDistThr = 25, 
+                                 posDistThr = 5, nNeg = 5, cached_queries = 60, 
+                                 cached_negatives = 60, positive_sampling = True)
         
         q_data_iter = data_iter(batch_size, train_dataset.qImages)
         db_data_iter = data_iter(batch_size, train_dataset.dbImages)

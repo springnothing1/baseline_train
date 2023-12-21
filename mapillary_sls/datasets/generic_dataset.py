@@ -32,10 +32,10 @@ class ImagesFromList(Dataset):
 
 
 class ImagesText(Dataset):
-	def __init__(self, dataset, transform):
+	def __init__(self, images, texts, transform):
 
-		self.images = np.asarray(dataset.qImages[dataset.qIdx])
-		self.texts = np.asarray(dataset.qText[dataset.qIdx])
+		self.images = np.asarray(images)
+		self.texts = np.asarray(texts)
 		self.transform = transform
 
 	def __len__(self):
