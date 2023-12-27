@@ -7,6 +7,7 @@ import clipvpr
 
 def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(0)
 
     llama_dir = "./path/to/LLaMA/"
 

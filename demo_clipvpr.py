@@ -6,6 +6,7 @@ from PIL import Image
 
 def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(0)
 
     model, process = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
             llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
