@@ -23,7 +23,7 @@ def llama_create_save(data_iter, city, transform, model, path, prompt_load, devi
     # len_iter = sum([1 for _ in data_iter])
     count = 0
     results = []
-    print("\n=====>city:" + city + " " + task + " start:")
+    print("=====>city:" + city + " " + task + " start:")
     for images in data_iter:
         if len(images) == 0:
             break
@@ -80,7 +80,7 @@ def main():
         llama_create_save(q_data_iter, city, transform, model, query_path, prompt_load, device, len(train_dataset.qImages), "query")
         llama_create_save(db_data_iter, city, transform, model, database_path, prompt_load, device, len(train_dataset.dbImages), "database")
         
-        print("=====>city:" + city + " end!!!")         
+        print("=====>city:" + city + " end!!!\n")         
                 
 
 if __name__ == "__main__":
