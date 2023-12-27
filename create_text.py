@@ -41,6 +41,7 @@ def llama_create_save(data_iter, city, transform, model, path, prompt_load, devi
 
 def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    torch.cuda.set_device(0)
     batch_size = 16
     llama_dir = "./path/to/LLaMA/"
 
