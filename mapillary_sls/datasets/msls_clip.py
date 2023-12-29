@@ -481,5 +481,4 @@ class MSLSCLIP(Dataset):
         text = [self.qText[qidx]]
         text.append(self.dbText[pidx])
         text.extend([self.dbText[idx] for idx in nidx])
-        return torch.cat(output), clip.tokenize(text)
-        #return torch.cat(output), torch.tensor(target)
+        return torch.cat(output), clip.tokenize(text, truncate=True)
