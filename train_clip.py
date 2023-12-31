@@ -24,7 +24,7 @@ from mapillary_sls.datasets.msls import MSLS
 from mapillary_sls.datasets.msls_clip import MSLSCLIP
 from mapillary_sls.utils.utils import configure_transform, clip_transform
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 
 # save the best recall@1
