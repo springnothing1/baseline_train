@@ -18,7 +18,7 @@ def save_evaluate(args, net, epoch, i=999999, cities='cph,sf'):
     print(f'\nStart to evaluate the prediction of cities: {cities}')
     evaluate_path = Path(os.path.join(outpath, Path(f"evaluate_task{cities}_epoch{epoch + 1}_i{i}.csv")))
     recall_1 = evaluate.main(args, predict_path, evaluate_path, cities)
-    print(f'evaluate the model sucessfully! you can see the result in {outpath}')
+    print(f'evaluate the model sucessfully! you can see the result in {outpath}\n')
     return recall_1
 
 

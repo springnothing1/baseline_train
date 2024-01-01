@@ -104,7 +104,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_pat
                 RECALL_BEST = recall_candidate
                 # set checkpoint
                 save_checkpoint(net, optimizer, epoch, loss, model_path)
-                print(f'\n++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!\n')
+                print(f'++++save the best net with recall@1:{RECALL_BEST:.3} successfully!!\n')
 
     print(f"epoch{epoch + 1} if end ")           
     recall_candidate = save_evaluate(args, net, epoch, i, cities='cph,sf')
