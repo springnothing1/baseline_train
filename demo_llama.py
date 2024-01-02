@@ -10,18 +10,20 @@ def main():
     torch.cuda.set_device(0)
 
     llama_dir = "./path/to/LLaMA/"
+    num = 4
 
     # choose from BIAS-7B, LORA-BIAS-7B, CAPTION-7B.pth
     model, preprocess = llama.load("BIAS-7B", llama_dir, device=device)
     model.eval()
 
     #prompts_list = ['Please introduce this painting.', 'Please introduce this painting.']
-    prompts_list = 2 * ['Is there a sidewalk on the road in the picture?']
+    prompts_list = num * ['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a building in the picture? Which side of the picture has more buildings? Is there more vegetation on the left or right in the picture?']
 
     prompts = [llama.format_prompt(prompt) for prompt in prompts_list]
-    img1 = Image.fromarray(cv2.imread("./data/image1.jpg"))
-    img2 = Image.fromarray(cv2.imread("./data/image2.jpg"))
-    imgs = [img1, img2]
+    imgs = []
+    for i in range(num):
+        img = Image.fromarray(cv2.imread("./data/image" + str(i + 1) + ".jpg"))
+        imgs.append(img)
     img = torch.stack([preprocess(img).to(device) for img in imgs], dim=0)
     print(img.shape)
     result = model.generate(img, prompts, max_gen_len=77)
