@@ -16,8 +16,7 @@ def main():
     model, preprocess = llama.load("BIAS-7B", llama_dir, device=device)
     model.eval()
 
-    #prompts_list = ['Please introduce this painting.', 'Please introduce this painting.']
-    prompts_list = num * ['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a building in the picture? Which side of the picture has more buildings? Is there more vegetation on the left or right in the picture?']
+    prompts_list = num * ['You are currently sitting in a moving car. You need to capture geographically recognizable information in the image and answer the following question in short sentences from the perspective of the image: How many lanes are there on the road. Are there any residential buildings or houses in the photo. Are there more vegetation, trees, or green lawns in the pictures on the left or right? Is the environment in the picture more inclined towards urban or rural areas.']
 
     prompts = [llama.format_prompt(prompt) for prompt in prompts_list]
     imgs = []
