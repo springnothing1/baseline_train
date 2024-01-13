@@ -48,12 +48,17 @@ def main():
     # choose from BIAS-7B, LORA-BIAS-7B, CAPTION-7B.pth
     model, transform = llama.load("BIAS-7B", llama_dir, device=device)
     model.eval().to(device)
+    
+    # set the prompt
     prompt = ['You are currently sitting in a moving car. You need to capture geographically recognizable information in the image and answer the following question in short sentences from the perspective of the image: How many lanes are there on the road. Are there any residential buildings or houses in the photo. Are there more vegetation, trees, or green lawns in the pictures on the left or right? Is the environment in the picture more inclined towards urban or rural areas.']
     prompt_load = [llama.format_prompt(prompt)]
-    # cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,berlin,ottawa,phoenix,goa,amman,nairobi,manila".split(",")
-    cities = "phoenix,goa,amman,nairobi,ottawa,manila".split(",")
+    cities = "trondheim,london,boston,melbourne,amsterdam,helsinki,tokyo,toronto,saopaulo,moscow,zurich,paris,bangkok,budapest,austin,berlin,ottawa,phoenix,goa,amman,nairobi,manila".split(",")
     # cities = "sf,cph".split(',')
+    
+    # the root of msls
     root_dir = Path('/root/autodl-tmp/msls').absolute()
+    # root_dir = Path('/datasets/msls').absolute()
+    
     num_cities = len(cities)
     for i, city in enumerate(cities):
         print(f"\n=====>city[{i + 1}/{num_cities}]:" + city + " start:")
