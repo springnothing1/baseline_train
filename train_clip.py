@@ -11,7 +11,6 @@ import time
 import torch
 import clip
 import argparse
-import clipvpr
 import torchvision
 from torch import nn
 from pathlib import Path
@@ -54,11 +53,6 @@ def get_net(net_name = "resnet50+gem"):
 
     elif net_name == "resvit":
         net = ResTransformer()
-        
-    elif net_name == "clipvpr":
-        net, _ = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
-        llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
-        prompt=['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?'])
     
     elif net_name == "clip":
         net, _= clip.load("ViT-B/16")
@@ -87,7 +81,7 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_pat
         
         l.backward()
         optimizer.step()
-        metric.add(l * sequences.shape[0], N)
+        metric.add(l * sequences.shape[0], s_shape[0])
         
         train_loss = metric[0] / metric[1]
         
@@ -170,8 +164,7 @@ def create_dataloader(args):
         meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
         transform = configure_transform(image_dim = image_dim, meta = meta)
         
-
-    elif args.net_name in ["vit", "clip","clipvpr"]:
+    elif args.net_name in ["vit", "clipvpr"]:
         image_dim = (224, 224)
         transform = clip_transform(image_dim)
 
@@ -289,11 +282,7 @@ def main():
     net = get_net(net_name)
     
     #optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
-    if net_name == "clipvpr":
-        optimizer = torch.optim.AdamW(filter(lambda p : p.requires_grad, net.parameters()), 
-                                      lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
-    else:
-        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     
     print("\nloading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)

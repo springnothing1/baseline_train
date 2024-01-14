@@ -9,8 +9,8 @@
 import os
 import time
 import torch
-import argparse
 import clipvpr
+import argparse
 import torchvision
 from torch import nn
 from pathlib import Path
@@ -20,9 +20,10 @@ from modules.loss import InfoNCELoss,TripletLoss, MultiSimilarityLoss
 from modules.ResViT import ResTransformer
 from modules.GeMPooling import GeMPooling 
 from mapillary_sls.datasets.msls import MSLS
+from mapillary_sls.datasets.msls_clip import MSLSCLIP
 from mapillary_sls.utils.utils import configure_transform, clip_transform
 from torch.utils.data import DataLoader
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 
 # save the best recall@1
@@ -54,9 +55,7 @@ def get_net(net_name = "resnet50+gem"):
         net = ResTransformer()
         
     elif net_name == "clipvpr":
-        net, _ = clipvpr.load(clip_name="ViT-B/16", llama_name="BIAS-7B", llama_dir='./path/to/LLaMA/', llama_type="7B", 
-        llama_download_root='ckpts', max_seq_len=512, phase="finetune", 
-        prompt=['Is the scene in the picture urban or rural? How many lanes are there on the road in the photo? Is there a residential building in the picture? If so, which side of the road is it located on? Are there vegetation and trees in the photo? If so, which side of the road is it located on?'])
+        net, _ = clipvpr.load("ViT-B/16")
 
     return net
 
@@ -65,35 +64,46 @@ def train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_pat
     metric = d2l.Accumulator(2)
     global RECALL_BEST
     
-    for i, (sequences, labels) in enumerate(train_iter):
+    for i, (sequences, texts) in enumerate(train_iter):
         net.train()
-        N = labels.shape[1]
+        N = 2 + args.num_negatives
         q_seq_length, db_seq_length = split_seq(sequences, N, args.task)
         # sequences.shape=(batch_size, len(q)+len(p)+len(neg), 3, 480, 640)
         s_shape = sequences.shape
-        X = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(next(net.parameters()).device)
-
-        y_hat = net(X)
+        images = sequences.reshape(-1, s_shape[-3], s_shape[-2], s_shape[-1]).to(next(net.parameters()).device)
+        
+        # if clipvpr, add texts to net
+        if args.net_name == "clipvpr":
+            texts = texts.reshape(-1, texts.shape[-1]).to(next(net.parameters()).device)
+            y_hat = net(images, texts)
+        else:
+            y_hat = net(images)
         y_hat = y_hat.reshape(s_shape[0], s_shape[1], -1)
         
         optimizer.zero_grad()
         
+        # compute the loss
         l = loss(y_hat, q_seq_length, db_seq_length, N)
         
         l.backward()
         optimizer.step()
-        metric.add(l * sequences.shape[0], labels.numel())
+        metric.add(l * sequences.shape[0], s_shape[0])
         
         train_loss = metric[0] / metric[1]
         
+        # recore the loss for every 1000 mini_batches
         if (i % 1000 == 0) and (i != 0):
             print(f'epoch:[{epoch + 1}/{args.num_epochs}],\tbatch:[{i}/{len(train_iter)}],\tloss:{train_loss:f}')
             niter = epoch * len(train_iter) + i
             writer.add_scalars("Train loss", {"train loss:": l.data.item()}, niter)
 
+        # test the accuracy for every 10000 mini_batches
         if (i % 10000 == 0) and (i != 0):
             # evaluate on val_cities
             recall_candidate = save_evaluate(args, net, epoch, i, cities='cph,sf')
+            
+            n_test = epoch * len(train_iter) + i
+            writer.add_scalars("Accuracy", {"accuracy:": recall_candidate}, n_test)
             if recall_candidate > RECALL_BEST:
                 # save the best reall@1 in one epoch
                 RECALL_BEST = recall_candidate
@@ -165,20 +175,22 @@ def create_dataloader(args):
         meta = {'mean': [0.485, 0.456, 0.406], 'std': [0.229, 0.224, 0.225]}
         transform = configure_transform(image_dim = image_dim, meta = meta)
         
-
     elif args.net_name in ["vit", "clipvpr"]:
         image_dim = (224, 224)
         transform = clip_transform(image_dim)
-
-    # whether to use positive sampling
-    positive_sampling = True
-    
-    # return the train dataset
-    train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
+        
+    if args.net_name == "clipvpr":
+        train_dataset = MSLSCLIP(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
                         posDistThr = 5, nNeg = args.num_negatives, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
-                    
+    else:
+        train_dataset = MSLS(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
+                        task = args.task, seq_length = args.seq_length, negDistThr = 25, 
+                        posDistThr = 5, nNeg = args.num_negatives, cached_queries = args.cached_queries, 
+                        cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
+    # whether to use positive sampling
+    positive_sampling = True
     
     # divides dataset into smaller cache sets
     train_dataset.new_epoch()
@@ -282,15 +294,11 @@ def main():
     # get the net(new=True)you can choose to change something in the end
     net_name = args.net_name
     net = get_net(net_name)
-    
+    print("\nload the net successfully")
     #optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
-    if net_name == "clipvpr":
-        optimizer = torch.optim.AdamW(filter(lambda p : p.requires_grad, net.parameters()), 
-                                      lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
-    else:
-        optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
+    optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     
-    print("\nloading.......\n")
+    print("loading.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
     trainDataloader = create_dataloader(args)
 
