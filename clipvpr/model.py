@@ -340,18 +340,19 @@ class CLIP(nn.Module):
     def encode_image(self, image):
         return self.visual(image.type(self.dtype))
 
-    def encode_text(self, text, image):
-        end_index = text.argmax(dim=-1)
-        x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
+    def encode_text(self, texts, images):
+        end_index = texts.argmax(dim=-1)
         
-        # get the real text tokens without the start&end token
-        start_token, text_token, end_token = x[:, 0, :].unsqueeze(1), x[:, 1:end_index, :], x[:, end_index:, :]
-        if len(end_token) == 1:
-            end_token = end_token.unsqueeze(1)
+        x = self.token_embedding(texts).type(self.dtype)  # [batch_size, n_ctx, d_model]
         
-        text_token = text_token + image.unsqueeze(1)
-        x = torch.cat([start_token, text_token, end_token], dim=1)
-
+        list_texts_image = []
+        for text, index, image in zip(x, end_index, images):
+            start_token, text_token, end_token = text[0, :], text[1: index, :], text[index:, :]
+            text_image_token = text_token + image.unsqueeze(0)
+            text_image = torch.cat((start_token.unsqueeze(0), text_image_token, end_token), dim=0)
+            list_texts_image.append(text_image)
+        x = torch.stack(list_texts_image, dim=0)
+        
         x = x + self.positional_embedding.type(self.dtype)
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
@@ -362,7 +363,7 @@ class CLIP(nn.Module):
         # take features from the eot embedding (eot_token is the highest number in each sequence)
         # each sentence(include !,. and start token，end token), extract the useful token,(3, 512) @ (512, 512),
         # extract features from the eot embedding (eot_token is the highest number in each sequence)
-        x = x[torch.arange(x.shape[0]), text.argmax(dim=-1)] @ self.text_projection
+        x = x[torch.arange(x.shape[0]), texts.argmax(dim=-1)] @ self.text_projection
 
         return x
 
@@ -372,7 +373,7 @@ class CLIP(nn.Module):
         
         #logit_scale = self.logit_scale.exp()
         # all_feature = torch.cat((image_features, text_features), dim=1)
-        all_feature = self.encode_text(image_features)
+        all_feature = self.encode_text(text, image_features)
         
         return all_feature
 

@@ -211,7 +211,7 @@ def create_dataset_loader(cities, args):
     # choose subtask to test on [all, s2w, w2s, o2n, n2o, d2n, n2d]
     subtask = 'all'
 
-    if args.net_name == "clip":
+    if args.net_name == "clipvpr":
         
         val_dataset = MSLSCLIP(root_dir, cities = cities, transform = transform, mode = 'test',
                         task = task, seq_length = seq_length, subtask = subtask, posDistThr = posDistThr)
@@ -248,7 +248,7 @@ def main(args, net, out_path, cities):
 
     # print("***load the net successfully")
     # compute the feature of query and database
-    if args.net_name == "clip":
+    if args.net_name == "clipvpr":
         q_feature, q_idx = predict_clip_feature(net, qLoader, device, task.split('2')[0])
         db_feature, _ = predict_clip_feature(net, dbLoader, device, task.split('2')[1])
     else:

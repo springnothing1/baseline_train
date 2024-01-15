@@ -145,7 +145,7 @@ def train(args, net, train_iter, loss, optimizer):
         train_loss = train_epoch(args, epoch, net, train_iter, optimizer, loss, writer, model_path)
             
         # save the models and evaluate on train_cities
-        _ = save_evaluate(args, net, epoch, cities='trondheim,london,boston')
+        # _ = save_evaluate(args, net, epoch, cities='trondheim,london,boston')
 
         # record the time
         epoch_end = time.time()
@@ -178,7 +178,10 @@ def create_dataloader(args):
     elif args.net_name in ["vit", "clipvpr"]:
         image_dim = (224, 224)
         transform = clip_transform(image_dim)
-        
+    
+    # whether to use positive sampling
+    positive_sampling = True
+    
     if args.net_name == "clipvpr":
         train_dataset = MSLSCLIP(root_dir=args.msls_root, cities = args.cities, transform = transform, mode = 'train', 
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
@@ -189,8 +192,6 @@ def create_dataloader(args):
                         task = args.task, seq_length = args.seq_length, negDistThr = 25, 
                         posDistThr = 5, nNeg = args.num_negatives, cached_queries = args.cached_queries, 
                         cached_negatives = args.cached_negatives, positive_sampling = positive_sampling)
-    # whether to use positive sampling
-    positive_sampling = True
     
     # divides dataset into smaller cache sets
     train_dataset.new_epoch()
@@ -298,7 +299,7 @@ def main():
     #optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     optimizer = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=0.001, betas=(0.9,0.999), eps=1e-08)
     
-    print("loading.......\n")
+    print("loading the dataset.......\n")
     # create the train dataset first   (root_dir, cities, task, seq_length, batch_size)
     trainDataloader = create_dataloader(args)
 
